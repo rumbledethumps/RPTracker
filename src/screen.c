@@ -255,4 +255,13 @@ void update_dashboard(void) {
     bool additive = (p->feedback & 0x01);
     draw_string(22, 12, additive ? "(ADDITIVE)" : "(FM SYNTH)", 
                 HUD_COL_MAGENTA, HUD_COL_BG);
+
+    // Sequencer Status (Row 1, right side)
+    draw_string(55, 1, "SEQ:", HUD_COL_CYAN, HUD_COL_BG);
+    if (seq.is_playing) {
+        draw_string(60, 1, "PLAYING", HUD_COL_GREEN, HUD_COL_BG);
+    } else {
+        draw_string(60, 1, "STOPPED", HUD_COL_RED, HUD_COL_BG);
+    }
+
 }

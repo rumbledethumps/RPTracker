@@ -11,6 +11,8 @@ uint8_t current_instrument = 0; // Instrument index (0 = Piano)
 uint8_t current_octave = 4; // Adjusts in jumps of 12
 uint8_t active_midi_note = 0;      // Tracks the currently playing note
 
+SequencerState seq = {false, 6, 0, 125};
+
 #define KEY_REPEAT_DELAY 20 // Frames before repeat starts
 #define KEY_REPEAT_RATE  4  // Frames between repeats
 uint8_t repeat_timer = 0;
@@ -43,48 +45,47 @@ static int8_t get_semitone(uint8_t scancode) {
 }
 
 void player_tick(void) {
-    uint8_t channel = 0;
+    uint8_t channel = cur_channel; // Map piano to the active grid channel
     bool note_pressed_this_frame = false;
     uint8_t target_note = 0;
+    uint8_t semitone = 0;
 
-    // 1. Scan the piano keys
-    // We iterate through the bitmask to find the first pressed piano key
+    // 1. Scan for piano keys
     for (int k = 0; k < 256; k++) {
-        if (key(k)) { // Using the bitmask check from your input logic
-            int8_t semitone = get_semitone(k);
-            if (semitone != -1) {
-                // MIDI 60 is C-4.
+        if (key(k)) {
+            int8_t s = get_semitone(k);
+            if (s != -1) {
+                semitone = s;
                 target_note = (current_octave + 1) * 12 + semitone;
                 note_pressed_this_frame = true;
-                break; // Found a note, stop looking (Monophonic)
+                break; 
             }
         }
     }
 
-    // 2. Logic: Note On
+    // 2. Logic: Note On & Recording
     if (note_pressed_this_frame) {
-        // If it's a new note, or we weren't playing anything
         if (target_note != active_midi_note) {
+            // Stop previous note if still playing
             if (active_midi_note != 0) OPL_NoteOff(channel); 
             
+            // Play new note
             OPL_NoteOn(channel, target_note);
             active_midi_note = target_note;
-            printf("Playing MIDI: %d\n", target_note);
 
-            if (edit_mode && note_pressed_this_frame) {
+            // --- RECORDING LOGIC ---
+            if (edit_mode) {
                 PatternCell c;
                 c.note = target_note;
-                c.inst = current_instrument;
-                c.vol = 63; // Max volume default
+                c.inst = current_instrument; // Ensure this is the global 'brush'
+                c.vol = 63; 
                 c.effect = 0;
                 
                 write_cell(cur_pattern, cur_row, cur_channel, &c);
+                render_row(cur_row); // Draw what we just recorded
                 
-                // Auto-advance
-                if (cur_row < 63) cur_row++;
-                // Trigger a redraw of the grid here
+                if (cur_row < 31) cur_row++; // Advance
             }
-
         }
     } 
     // 3. Logic: Note Off
@@ -92,35 +93,32 @@ void player_tick(void) {
         if (active_midi_note != 0) {
             OPL_NoteOff(channel);
             active_midi_note = 0;
-            printf("Key Released\n");
         }
     }
 
-    // 4. Octave Switching (Using F1/F2)
-    // Note: Use key_pressed (edge detection) so it only moves 1 octave per tap
+    // 4. Function Keys (Octave & Instrument)
     if (key_pressed(KEY_F1)) { if (current_octave > 0) current_octave--; update_dashboard(); }
     if (key_pressed(KEY_F2)) { if (current_octave < 8) current_octave++; update_dashboard(); }
 
     if (key_pressed(KEY_F3)) { 
-        if (current_instrument > 0) {
-            current_instrument--;
-            OPL_SetPatch(cur_channel, &gm_bank[current_instrument]);
-            update_dashboard(); // Redraw instrument name/values at top
-        }
+        current_instrument--;
+        OPL_SetPatch(cur_channel, &gm_bank[current_instrument]);
+        update_dashboard();
     }
     if (key_pressed(KEY_F4)) { 
-        if (current_instrument < 127) {
-            current_instrument++;
+        current_instrument++; // int8 wraps naturally
+        OPL_SetPatch(cur_channel, &gm_bank[current_instrument]);
+        update_dashboard();
+    }
+    if (key_pressed(KEY_F5)) { // Use F5 to "Pick" the instrument under the cursor
+        PatternCell cell;
+        read_cell(cur_pattern, cur_row, cur_channel, &cell);
+        if (cell.note != 0) {
+            current_instrument = cell.inst;
             OPL_SetPatch(cur_channel, &gm_bank[current_instrument]);
             update_dashboard();
         }
     }
-
-    if (key_pressed(KEY_F3) || key_pressed(KEY_F4)) {
-        // ... instrument logic ...
-        update_dashboard(); // Refresh the labels at the top
-    }   
-
 }
 
 void handle_navigation() {
@@ -172,6 +170,100 @@ void handle_navigation() {
     // Optional: Toggle Edit mode with Space inside navigation
     if (key_pressed(KEY_SPACE)) {
         edit_mode = !edit_mode;
+    }
+
+}
+
+void sequencer_step(void) {
+    if (!seq.is_playing) return;
+
+    seq.tick_counter++;
+
+    if (seq.tick_counter >= seq.ticks_per_row) {
+        seq.tick_counter = 0;
+
+        uint8_t old_row = cur_row;
+        // Advance row logic...
+        if (cur_row < 31) cur_row++; else cur_row = 0;
+
+        for (uint8_t ch = 0; ch < 9; ch++) {
+            PatternCell cell;
+            read_cell(cur_pattern, cur_row, ch, &cell);
+            
+            if (cell.note != 0) {
+                // 1. Always stop the previous sound on this channel first
+                OPL_NoteOff(ch); 
+                
+                if (cell.note != 255) {
+                    // 2. Load the new patch
+                    OPL_SetPatch(ch, &gm_bank[cell.inst]);
+                    
+                    // 3. Trigger the new note
+                    // The FPGA FIFO handles these back-to-back writes perfectly
+                    OPL_NoteOn(ch, cell.note);
+                }
+            }
+        }
+
+        update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+    }
+}
+
+void handle_transport_controls() {
+    // F5: Play / Pause
+    if (key_pressed(KEY_F6)) {
+        seq.is_playing = !seq.is_playing;
+        seq.tick_counter = seq.ticks_per_row; // Trigger first row immediately
+        update_dashboard(); // Show Play/Pause status
+    }
+
+    // F6: Stop & Reset
+    if (key_pressed(KEY_F7)) {
+        seq.is_playing = false;
+        
+        // Silence all channels
+        for (uint8_t i = 0; i < 9; i++) OPL_NoteOff(i);
+        
+        // Reset to beginning
+        uint8_t old = cur_row;
+        cur_row = 0;
+        seq.tick_counter = 0;
+        
+        update_cursor_visuals(old, 0, cur_channel, cur_channel);
+        update_dashboard();
+    }
+}
+
+void handle_editing(void) {
+    if (!edit_mode) return;
+
+    // Check for Backspace or Delete key
+    if (key_pressed(KEY_BACKSPACE) || key_pressed(KEY_DELETE)) {
+        
+        // 1. Create an empty cell (all zeros)
+        PatternCell empty = {0, 0, 0, 0};
+        
+        // 2. Write to XRAM at current cursor position
+        write_cell(cur_pattern, cur_row, cur_channel, &empty);
+        
+        // 3. Redraw the row to reflect the empty cell
+        render_row(cur_row);
+        
+        // 4. (Standard Tracker Behavior) Auto-advance to the next row
+        if (cur_row < 31) {
+            uint8_t old_row = cur_row;
+            cur_row++;
+            update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+        }
+        
+        printf("Cell Cleared at Row %d\n", cur_row - 1);
+    }
+
+    if (key_pressed(KEY_GRAVE)) {
+        PatternCell off = {255, current_instrument, 0, 0};
+        write_cell(cur_pattern, cur_row, cur_channel, &off);
+        render_row(cur_row);
+        if (cur_row < 31) cur_row++; 
     }
 
 }

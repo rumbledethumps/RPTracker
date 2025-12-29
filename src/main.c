@@ -50,6 +50,20 @@ static void init_graphics(void)
 
 }
 
+void init_patterns(void) {
+    // We have ~44KB of pattern space at 0x0000. 
+    // Let's clear at least the first few patterns (e.g., 8 patterns).
+    // 8 patterns * 2304 bytes = 18,432 bytes.
+    
+    RIA.addr0 = 0x0000; // Start of Pattern Data
+    RIA.step0 = 1;
+    
+    // Clear 20KB to be safe (covers 8+ patterns)
+    for (uint16_t i = 0; i < 20480; i++) {
+        RIA.rw0 = 0; 
+    }
+}
+
 int main(void)
 {
     // 1. Hardware Initialization
@@ -68,6 +82,7 @@ int main(void)
     
     // 3. Initial State Draw
     update_dashboard();  // Draw the DYNAMIC values (The actual hex numbers)
+    init_patterns();    // Clear pattern data
     render_grid();       // Initial grid draw
     update_cursor_visuals(0, 0, 0 ,0); // Initial cursor at 0,0
 
@@ -96,13 +111,29 @@ int main(void)
 
         // --- INPUT STAGE ---
         handle_input(); // This MUST update keystates AND prev_keystates
-        handle_navigation(); 
+
+        // Check Transport (Play/Stop)
+        handle_transport_controls();
+
+        if (!seq.is_playing) {
+            handle_navigation();
+            handle_editing(); // Check for backspace/delete
+        }
+
+        // The Sequencer "Heartbeat"
+        sequencer_step();
+
         player_tick();
         
         // --- UI REFRESH: Row or Channel Movement
         if (cur_row != prev_row || cur_channel != prev_chan) {
-            // We pass all 4 values to the visual update function
             update_cursor_visuals(prev_row, cur_row, prev_chan, cur_channel);
+            
+            // SYNC: Ensure the OPL2 hardware channel we just moved into 
+            // is loaded with our current "brush" instrument.
+            if (cur_channel != prev_chan) {
+                OPL_SetPatch(cur_channel, &gm_bank[current_instrument]);
+            }
         }
 
         // If something changed the instrument, octave, or edit mode
