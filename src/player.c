@@ -3,6 +3,7 @@
 #include "input.h"
 #include "usb_hid_keys.h"
 #include <stdio.h>
+#include "screen.h"
 
 // Current State
 uint8_t current_octave_offset = 0; // Adjusts in jumps of 12
@@ -62,6 +63,21 @@ void player_tick(void) {
             OPL_NoteOn(channel, target_note);
             active_midi_note = target_note;
             printf("Playing MIDI: %d\n", target_note);
+
+            if (edit_mode && note_pressed_this_frame) {
+                PatternCell c;
+                c.note = target_note;
+                c.inst = current_instrument;
+                c.vol = 63; // Max volume default
+                c.effect = 0;
+                
+                write_cell(cur_pattern, cur_row, cur_channel, &c);
+                
+                // Auto-advance
+                if (cur_row < 63) cur_row++;
+                // Trigger a redraw of the grid here
+            }
+
         }
     } 
     // 3. Logic: Note Off

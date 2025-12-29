@@ -1,64 +1,57 @@
-# RP6502 VSCode Scaffolding for LLVM-MOS
+# RPTracker 
+### A Native 6502 Music Tracker for the RP6502 & FPGA OPL2
 
-This is scaffolding for a new Picocomputer 6502 software project.
+**RPTracker** is a music composition tool designed specifically for the [RP6502 Picocomputer](https://github.com/picocomputer) equipped with a Yamaha YM3812 (OPL2) sound card implemented in a TinyFPGA. It leverages the unique dual-processor architecture of the RP6502 to provide a high-resolution 640x480 tracker interface and real-time FM synthesis.
 
-### LLVM PATH notes
+## 🛠 Hardware Architecture
 
-LLVM-MOS must be in your PATH. However, this may conflict with other LLVM
-installations, like the one that comes with your operating system.
-In that case, you can adjust the path for only CMake with a VSCode setting.
-Add a file `.vscode/settings.json` with the following contents. Adjust the
-path for where you installed LLVM-MOS.
-```
-{
-    "cmake.environment": {
-        "PATH": "~/llvm-mos/bin:${env:PATH}"
-    }
-}
-```
+- **CPU:** W65C02 running at 8MHz.
+- **Sound:** Yamaha YM3812 (OPL2) core on a TinyFPGA via PIX Bus.
+  - **Clock:** Optimized for 4.0MHz OPL2 timing.
+  - **Bus Interface:** PIX Bus Sniffer with a 512-entry hardware FIFO.
+  - **Mapping:** `$FF00` (Index), `$FF01` (Data), `$FF02` (FIFO Flush).
+- **Video:** VGA Mode 1 (640x480, 80x60 Text mode, 8-bit color).
+  - Each character cell uses 3 bytes: `[Character]`, `[Foreground]`, `[Background]`.
+- **Memory:** 
+  - **64KB RAM:** 6502 Code, Stack, Zero Page, and the 128-instrument Patch Bank.
+  - **64KB XRAM:** VGA Text/Attribute buffers and Pattern Data.
 
-### Linux Tools Install:
- * [VSCode](https://code.visualstudio.com/). This has its own installer.
- * An install of [LLVM-MOS](https://llvm-mos.org/wiki/Welcome).
-   See PATH notes above.
- * The following tools installed from your package manager:
-    * `sudo apt install cmake python3 pip git build-essential`
-    * `pip install pyserial`
+## 🎼 Software Features
 
-### Windows Tools Install:
- * [VSCode](https://code.visualstudio.com/). This has its own installer.
- * An install of [LLVM-MOS](https://llvm-mos.org/wiki/Welcome).
-   See PATH notes above.
- * Install python by typing `python3` which will launch the Microsoft Store
-   where you start the install. If python runs, this has already been done,
-   exit python with Ctrl-Z plus Return.
- * Install the python serial library with `pip install pyserial`.
- * `winget install -e --id Kitware.CMake`.
- * `winget install -e --id GnuWin32.Make`.
-    Add "C:\Program Files (x86)\GnuWin32\bin" to your path.
- * `winget install -e --id Git.Git`.
+- **Native Sequencing:** 64 rows per pattern, 9 channels of FM synthesis.
+- **Instrument Library:** 128 AdLib-compatible General MIDI patches stored in local RAM.
+- **Real-time Piano Input:** Musical keyboard mapping using standard USB HID scancodes.
+- **Low-Latency Input:** Direct bitmask reading of the RIA keyboard state for high-performance edge detection.
 
-### Getting Started:
-Go to the [GitHub template](https://github.com/picocomputer/vscode-llvm-mos)
-and select "Use this template" then "Create a new repository". GitHub will
-make a clean project for you to start with. Then you can download the
-repository and open the files.
+## 🎹 Keyboard Controls
 
-```
-$ git clone [path_to_github]
-$ cd [to_where_it_cloned]
-$ code .
-```
+### Musical Piano (Monophonic)
+- **Lower Octave (C-4 to B-4):** `Z` `S` `X` `D` `C` `V` `G` `B` `H` `N` `J` `M`
+- **Upper Octave (C-5 to B-5):** `Q` `2` `W` `3` `E` `R` `5` `T` `6` `Y` `7` `U`
 
-Install the extensions and choose the default or obvious choice if VSCode
-prompts you. Choose "[Unspecified]" for the CMake kit.
+### Navigation & Editing
+- **Arrow Keys:** Navigate the pattern grid (Row/Channel).
+- **Space:** Toggle Edit/Record Mode.
+- **F1 / F2:** Octave Down / Octave Up.
+- **F3 / F4:** Previous / Next Instrument.
+- **Delete / Backspace:** Clear current note/cell.
 
-"Start Debugging" (F5) will build your project and upload it to the
-Picocomputer over a USB cable plugged into the Pico VGA. There is no debugger
-for the 6502; this process will exit immediately after the upload.
-If the default communications device doesn't work, edit ".rp6502" in the
-project root folder. This file will be created the first time you
-"Start Debugging" and will be ignored by git.
+## 🚀 Build Instructions
 
-Edit CMakeLists.txt to add new source and asset files. It's
-pretty normal C/ASM development from here on.
+This project is compiled using the **LLVM-MOS** SDK.
+
+1. Ensure the `rp6502.h` and the OPL2 library from `RP6502_OPL2` are in your include path.
+2. Compile using the `mos-rp6502-generic` target.
+3. Upload the resulting `.elf` or `.rp6502` file to the Picocomputer via USB or SD card.
+
+## 📝 Roadmap
+- [x] OPL2 Initialization & 4.0MHz timing.
+- [x] Keyboard Scancode-to-MIDI mapping.
+- [x] VGA Mode 1 text initialization.
+- [ ] Pattern Grid Rendering (XRAM to Screen).
+- [ ] VSync-driven Playback Engine (60Hz).
+- [ ] Instrument Editor UI (Live register tweaking).
+- [ ] Disk I/O (Saving/Loading patterns to USB).
+
+---
+*Created by Jason Rowe.*
