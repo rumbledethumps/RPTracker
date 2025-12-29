@@ -39,12 +39,6 @@ static void init_graphics(void)
     RIA.addr0 = text_message_addr;
     RIA.step0 = 1;
     for (uint16_t i = 0; i < MESSAGE_LENGTH; i++) {
-        if (i==16){
-            RIA.rw0 = 'H';
-            RIA.rw0 = HUD_COL_YELLOW;
-            RIA.rw0 = HUD_COL_BG;
-            continue;
-        } else {
         RIA.rw0 = ' ';
         RIA.rw0 = HUD_COL_WHITE;
         RIA.rw0 = HUD_COL_BG;
@@ -91,22 +85,6 @@ int main(void)
         // 2. Process the "Piano" logic
         player_tick();
 
-
-        // Now write the MESSAGE_LENGTH characters into text RAM (3 bytes per char)
-        RIA.addr0 = text_message_addr;
-        RIA.step0 = 1;
-        for (uint16_t i = 0; i < MESSAGE_LENGTH; i++) {
-            if (i==17){
-                RIA.rw0 = 'W';
-                RIA.rw0 = HUD_COL_YELLOW;
-                RIA.rw0 = HUD_COL_BG;
-                continue;
-            } else {
-            RIA.rw0 = ' ';
-            RIA.rw0 = HUD_COL_WHITE;
-            RIA.rw0 = HUD_COL_BG;
-            }
-        }
 
     }
 }
