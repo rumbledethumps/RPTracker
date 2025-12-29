@@ -15,7 +15,6 @@ rp6502_executable(RPTracker
 )
 target_sources(RPTracker PRIVATE
     src/main.c
-    src/display.c
     src/input.c
     src/instruments.c
     src/opl.c

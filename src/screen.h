@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+extern char message[];
+
 // XRAM Pattern Base (from our map)
 #define PATTERN_XRAM_BASE 0x0000
 
@@ -20,6 +22,9 @@ extern uint8_t cur_pattern;
 extern uint8_t cur_channel;
 
 extern void write_cell(uint8_t pat, uint8_t row, uint8_t chan, PatternCell *cell);
+extern void render_grid(void);
+extern void update_cursor_visuals(uint8_t old_row, uint8_t new_row);
+extern void handle_navigation(void);
 
 
 #endif // SCREEN_H

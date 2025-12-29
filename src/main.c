@@ -1,12 +1,11 @@
 #include <rp6502.h>
 #include <stdio.h>
 #include "constants.h"
-#include "display.h"
 #include "input.h"
 #include "instruments.h"
 #include "opl.h"
 #include "player.h"
-
+#include "screen.h"
 
 unsigned text_message_addr;         // Text message address
 
@@ -66,10 +65,15 @@ int main(void)
     xregn(0, 0, 2, 1, GAMEPAD_INPUT);
 
     init_graphics();
-    init_input_system(); // From your input.c
-    // player_init();
+    render_grid(); // Initial draw
+    update_cursor_visuals(0, 0); // Highlight first row
 
-    OPL_SetPatch(0, &gm_bank[0]); // Set instrument 0 on channel 0
+    init_input_system(); // From your input.c
+
+    // Load General MIDI bank into OPL -- all Piano to start.
+    for (uint8_t i = 0; i < 9; i++){
+        OPL_SetPatch(i, &gm_bank[0]); // Set instrument 0 on channel 0
+    }
 
     uint8_t vsync_last = RIA.vsync;
 
@@ -80,6 +84,13 @@ int main(void)
 
         // 1. Read hardware state into keystates bitmask
         handle_input(); 
+
+        uint8_t prev_row = cur_row;
+        handle_navigation(); 
+        
+        if (cur_row != prev_row) {
+            update_cursor_visuals(prev_row, cur_row);
+        }
 
         // 2. Process the "Piano" logic
         player_tick();

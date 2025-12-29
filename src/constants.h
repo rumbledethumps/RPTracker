@@ -11,7 +11,8 @@
 #define MESSAGE_LENGTH (MESSAGE_WIDTH * MESSAGE_HEIGHT) // Total number of characters in the message area
 #define BYTES_PER_CHAR 3            // Number of bytes per character in text RAM
 
-#define TEXT_CONFIG 0x3000          // Text Plane Configuration
+#define TEXT_CONFIG 0xC000          // Text Plane Configuration
+extern unsigned text_message_addr; // Address where text message starts in XRAM
 
 // 5. Keyboard, Gamepad and Sound
 // -------------------------------------------------------------------------
@@ -76,5 +77,8 @@
 #define HUD_COL_MAGENTA 13  // Bright Magenta
 #define HUD_COL_CYAN    14  // Bright Cyan   (Fixed)
 #define HUD_COL_WHITE   15  // Bright White
+
+#define HUD_COL_HIGHLIGHT 4   // Dark Blue (Classic Tracker style)
+#define HUD_COL_CURSOR    12  // Bright Blue (Modern style)
 
 #endif // CONSTANTS_H

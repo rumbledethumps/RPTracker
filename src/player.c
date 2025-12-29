@@ -6,6 +6,7 @@
 #include "screen.h"
 
 // Current State
+uint8_t current_instrument = 0; // Instrument index (0 = Piano)
 uint8_t current_octave_offset = 0; // Adjusts in jumps of 12
 uint8_t active_midi_note = 0;      // Tracks the currently playing note
 
