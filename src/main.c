@@ -42,7 +42,6 @@ static void init_graphics(void)
         RIA.rw0 = ' ';
         RIA.rw0 = HUD_COL_WHITE;
         RIA.rw0 = HUD_COL_BG;
-        }
     }
 
     printf("TEXT_CONFIG=0x%X\n", TEXT_CONFIG);
@@ -84,7 +83,6 @@ int main(void)
 
         // 2. Process the "Piano" logic
         player_tick();
-
 
     }
 }
