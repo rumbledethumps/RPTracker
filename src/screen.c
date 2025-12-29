@@ -83,38 +83,70 @@ void draw_hex_byte(uint16_t vga_addr, uint8_t val) {
 }
 
 // pattern_row_idx: The row index in the pattern data (0-31)
-void render_row(uint8_t pattern_row_idx) {
-    uint8_t screen_y = pattern_row_idx + GRID_SCREEN_OFFSET;
-    uint16_t vga_row_ptr = text_message_addr + (screen_y * 80 * 3);
-    
-    // 1. Draw Row Number (Indices 0-3): "00 |"
-    RIA.addr0 = vga_row_ptr;
-    RIA.step0 = 3;
-    RIA.rw0 = hex_chars[(pattern_row_idx >> 4) & 0x0F];
-    RIA.rw0 = hex_chars[pattern_row_idx & 0x0F];
-    RIA.rw0 = ' ';
-    RIA.rw0 = '|';
+void render_row(uint8_t row_idx) {
+    PatternCell row_data[9];
+    uint8_t bg;
 
-    // 2. Draw 9 Channels
+    // 1. BUFFER THE DATA: Read the row from XRAM into 6502 internal RAM
+    // This prevents read_cell from clobbering RIA.addr0 during drawing.
     for (uint8_t ch = 0; ch < 9; ch++) {
-        PatternCell cell;
-        read_cell(cur_pattern, pattern_row_idx, ch, &cell);
-        
-        // Data block starts at index 4, 12, 20...
-        uint16_t ch_ptr = vga_row_ptr + (4 + ch * 8) * 3;
-        
-        // Note: index x, x+1, x+2
-        draw_note(ch_ptr, cell.note);
-        
-        // Instrument: index x+3, x+4
-        draw_hex_byte(ch_ptr + (3 * 3), cell.inst);
-        
-        // Volume: index x+5, x+6
-        draw_hex_byte(ch_ptr + (5 * 3), cell.vol);
+        read_cell(cur_pattern, row_idx, ch, &row_data[ch]);
+    }
 
-        // Channel Divider: index x+7
-        RIA.addr0 = ch_ptr + (7 * 3);
-        RIA.rw0 = '|';
+    // 2. SETUP VGA DRAWING
+    uint8_t screen_y = row_idx + GRID_SCREEN_OFFSET;
+    uint16_t vga_ptr = text_message_addr + (screen_y * 80 * 3);
+    
+    bg = (row_idx % 4 == 0) ? HUD_COL_BAR : HUD_COL_BG;
+
+    RIA.addr0 = vga_ptr;
+    RIA.step0 = 1;
+
+    // 3. DRAW ROW HEADER (4 chars: "00 |")
+    RIA.rw0 = hex_chars[row_idx >> 4]; RIA.rw0 = HUD_COL_CYAN;  RIA.rw0 = bg;
+    RIA.rw0 = hex_chars[row_idx & 0x0F]; RIA.rw0 = HUD_COL_CYAN;  RIA.rw0 = bg;
+    RIA.rw0 = ' ';                       RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
+    RIA.rw0 = '|';                       RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
+
+    // 4. DRAW CHANNELS (9 channels * 8 chars/ch = 72 chars)
+    for (uint8_t ch = 0; ch < 9; ch++) {
+        PatternCell *cell = &row_data[ch];
+
+        // Note (3 chars)
+        if (cell->note == 0) {
+            for(int i=0; i<3; i++) { RIA.rw0 = '.'; RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg; }
+        
+            for(int i=0; i<2; i++) { RIA.rw0 = '.'; RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg; }
+
+            for(int i=0; i<2; i++) { RIA.rw0 = '.'; RIA.rw0 = HUD_COL_SAGEGREEN; RIA.rw0 = bg; }
+
+        } else {
+            const char* names[] = {"C-","C#","D-","D#","E-","F-","F#","G-","G#","A-","A#","B-"};
+            uint8_t n = cell->note % 12;
+            uint8_t oct = (cell->note / 12) - 1;
+            RIA.rw0 = names[n][0]; RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
+            RIA.rw0 = names[n][1]; RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
+            RIA.rw0 = '0' + oct;   RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
+
+            // Instrument (2 chars: Magenta)
+            RIA.rw0 = hex_chars[cell->inst >> 4];   RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
+            RIA.rw0 = hex_chars[cell->inst & 0x0F]; RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
+
+            // Volume (2 chars: Green)
+            RIA.rw0 = hex_chars[cell->vol >> 4];    RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
+            RIA.rw0 = hex_chars[cell->vol & 0x0F];  RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
+
+        }
+
+        // Divider (1 char)
+        RIA.rw0 = '|'; RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
+    }
+
+    // This wipes the "trailing" blue from the highlight bar.
+    for (uint8_t i = 0; i < 4; i++) {
+        RIA.rw0 = ' ';             // Space character
+        RIA.rw0 = HUD_COL_WHITE;   // Foreground color doesn't matter for space
+        RIA.rw0 = bg;              // Restore Black or Grey background
     }
 }
 
@@ -139,29 +171,54 @@ void set_row_color(uint8_t row_idx, uint8_t bg_color) {
 void update_cursor_visuals(uint8_t old_row, uint8_t new_row, uint8_t old_ch, uint8_t new_ch) {
     uint8_t old_y = old_row + GRID_SCREEN_OFFSET;
     uint8_t new_y = new_row + GRID_SCREEN_OFFSET;
-
-    // --- 1. CLEAN UP OLD STATE ---
-    set_text_color(0, old_y, 80, HUD_COL_WHITE, HUD_COL_BG);
     
-    // Reset Header: "CH x" is at index 6 within the 8-char block (starting at 4).
-    // So CH text is at index 6, 14, 22...
-    set_text_color(6 + (old_ch * 8), 27, 4, HUD_COL_CYAN, HUD_COL_BG);
-
-    // --- 2. APPLY NEW ROW HIGHLIGHT ---
-    set_text_color(0, new_y, 80, HUD_COL_WHITE, HUD_COL_HIGHLIGHT);
-
-    // --- 3. APPLY YELLOW CELL HIGHLIGHT ---
+    // --- 1. DETERMINE COLORS BASED ON MODE ---
+    uint8_t bar_color, cell_color;
     
-    // Highlight Row Number in Yellow (Index 0-1)
-    set_text_color(0, new_y, 2, HUD_COL_YELLOW, HUD_COL_HIGHLIGHT);
+    if (edit_mode) {
+        bar_color = HUD_COL_EDIT_BAR;
+        cell_color = HUD_COL_EDIT_CELL;
+    } else {
+        bar_color = HUD_COL_PLAY_BAR;
+        cell_color = HUD_COL_PLAY_CELL;
+    }
 
-    // Highlight only the ACTIVE DATA (7 chars: Note+Inst+Vol)
-    // Starts at index 4, 12, 20...
+    // --- 2. CLEAN UP OLD ROW ---
+    render_row(old_row);
+
+    // --- 3. PAINT NEW ROW HIGHLIGHT ---
+    RIA.addr0 = text_message_addr + (new_y * 80 * 3) + 2; // Point to BG byte
+    RIA.step0 = 3; 
+    for (uint8_t i = 0; i < 80; i++) {
+        RIA.rw0 = bar_color;
+    }
+
+    // --- 4. PAINT ACTIVE CELL (Yellow text on Mode-Specific Red/Blue) ---
     uint8_t cell_x = 4 + (new_ch * 8);
-    set_text_color(cell_x, new_y, 7, HUD_COL_YELLOW, HUD_COL_HIGHLIGHT);
+    uint16_t cell_addr = text_message_addr + (new_y * 80 + cell_x) * 3;
+    
+    RIA.addr0 = cell_addr;
+    RIA.step0 = 1; 
+    for (uint8_t i = 0; i < 7; i++) {
+        RIA.addr0++;         // Skip Character
+        RIA.rw0 = HUD_COL_YELLOW; 
+        RIA.rw0 = cell_color; // Apply Red or Blue BG
+    }
 
-    // Highlight "CH x" in Header in Yellow (Index 6, 14, 22...)
-    set_text_color(6 + (new_ch * 8), 27, 4, HUD_COL_YELLOW, HUD_COL_BG);
+    // --- 5. HEADER SYNC (Row 27) ---
+    // Clear old
+    uint8_t old_hdr_x = 6 + (old_ch * 8);
+    uint16_t old_hdr_addr = text_message_addr + (27 * 80 + old_hdr_x) * 3 + 1;
+    RIA.addr0 = old_hdr_addr;
+    RIA.step0 = 3;
+    for(int i=0; i<4; i++) RIA.rw0 = HUD_COL_CYAN;
+
+    // Highlight new (Yellow on Black)
+    uint8_t new_hdr_x = 6 + (new_ch * 8);
+    uint16_t new_hdr_addr = text_message_addr + (27 * 80 + new_hdr_x) * 3 + 1;
+    RIA.addr0 = new_hdr_addr;
+    RIA.step0 = 3;
+    for(int i=0; i<4; i++) RIA.rw0 = HUD_COL_YELLOW;
 }
 
 void draw_string(uint8_t x, uint8_t y, const char* s, uint8_t fg, uint8_t bg) {
@@ -256,7 +313,7 @@ void update_dashboard(void) {
     draw_string(22, 12, additive ? "(ADDITIVE)" : "(FM SYNTH)", 
                 HUD_COL_MAGENTA, HUD_COL_BG);
 
-    // Sequencer Status (Row 1, right side)
+    // 4. Sequencer Status (Row 1, right side)
     draw_string(55, 1, "SEQ:", HUD_COL_CYAN, HUD_COL_BG);
     if (seq.is_playing) {
         draw_string(60, 1, "PLAYING", HUD_COL_GREEN, HUD_COL_BG);

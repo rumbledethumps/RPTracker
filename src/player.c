@@ -170,6 +170,9 @@ void handle_navigation() {
     // Optional: Toggle Edit mode with Space inside navigation
     if (key_pressed(KEY_SPACE)) {
         edit_mode = !edit_mode;
+        // Force a visual refresh even if row/column didn't move
+        update_cursor_visuals(cur_row, cur_row, cur_channel, cur_channel);
+        update_dashboard();
     }
 
 }

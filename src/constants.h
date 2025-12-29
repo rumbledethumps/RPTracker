@@ -75,10 +75,28 @@ extern unsigned text_message_addr; // Address where text message starts in XRAM
 #define HUD_COL_YELLOW  11  // Bright Yellow (Fixed)
 #define HUD_COL_BLUE    12  // Bright Blue
 #define HUD_COL_MAGENTA 13  // Bright Magenta
+#define HUD_COL_DPURPLE 61 // Dark Purple (Custom)
 #define HUD_COL_CYAN    14  // Bright Cyan   (Fixed)
 #define HUD_COL_WHITE   15  // Bright White
 
-#define HUD_COL_HIGHLIGHT 4   // Dark Blue (Classic Tracker style)
+#define HUD_COL_SAGEGREEN 113 // Sage Green for text labels
+
+#define HUD_COL_DARKGREY 8     // Dark Grey ANSI
+#define HUD_COL_BAR      238   // Dark Grey for bars (every 4th row)
+
+#define HUD_COL_HIGHLIGHT 18   // Dark Blue (Classic Tracker style)
+#define HUD_COL_SELECT_BG    21  // Brighter Blue (The active cell background)
 #define HUD_COL_CURSOR    12  // Bright Blue (Modern style)
+
+    
+// --- Edit Mode Colors ---
+#define HUD_COL_EDIT_BAR    88   // Deep Dark Red (The whole row)
+#define HUD_COL_EDIT_CELL   196  // Vivid Bright Red (The active cell)
+
+// --- Existing Blue Colors (for reference) ---
+#define HUD_COL_PLAY_BAR    18   // Deep Blue
+#define HUD_COL_PLAY_CELL   21   // Bright Blue
+
+  
 
 #endif // CONSTANTS_H
