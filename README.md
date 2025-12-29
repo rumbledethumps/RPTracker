@@ -7,66 +7,56 @@
 
 ## 🎹 Keyboard Control Reference
 
-RPTracker is designed to be operated entirely from the keyboard for high-speed composition.
+RPTracker uses a dual-mode input system: **Global Brush** adjustments (for future notes) and **In-Place Editing** (tweaking existing notes).
 
 ### 1. Musical Keyboard (Piano Layout)
-The keyboard is mapped into two octaves using a standard "FastTracker II" style layout.
-*   **Lower Octave (C-4 to B-4):**
-    *   `Z` (C) `S` (C#) `X` (D) `D` (D#) `C` (E) `V` (F) `G` (F#) `B` (G) `H` (G#) `N` (A) `J` (A#) `M` (B)
-*   **Upper Octave (C-5 to B-5):**
-    *   `Q` (C) `2` (C#) `W` (D) `3` (D#) `E` (E) `R` (F) `5` (F#) `T` (G) `6` (G#) `Y` (A) `7` (A#) `U` (B)
+*   **Lower Octave (C-4 to B-4):** `Z S X D C V G B H N J M`
+*   **Upper Octave (C-5 to B-5):** `Q 2 W 3 E R 5 T 6 Y 7 U`
 
-### 2. Transport & Playback
-*   **F6:** Play / Pause Toggle.
-*   **F7:** Stop & Reset (Stops all sound and moves cursor to Row 00).
+### 2. Global "Brush" Controls
+These keys change the settings for the **next** notes you record. 
+*   **F1 / F2** or **- / =**: Decrease / Increase the global keyboard **Octave** (Range: 0-8).
+*   **F3 / F4**: Previous / Next **Instrument** (Wraps 00-FF).
+*   **[ / ]**: Decrease / Increase global **Volume** (Range: 00-3F).
 
-### 3. Navigation & Mode Selection
-*   **Arrow Keys:** Navigate the 9-channel pattern grid. (Includes auto-repeat logic).
-*   **Spacebar:** Toggle **Edit Mode**. 
-    *   *Blue Cursor:* Safe/Preview Mode. Piano keys play sound but do not record.
-    *   *Red Cursor:* Record Mode. Piano keys record notes into the grid and auto-advance the cursor.
+### 3. In-Place Editing (SHIFT + Key)
+Use these while in **Edit Mode** to tweak the cell under the cursor without re-playing the note.
+*   **SHIFT + - / =**: **Transpose** the note in the current cell up/down by one semitone.
+*   **SHIFT + F3 / F4**: Change the **Instrument** of the current cell only.
+*   **SHIFT + [ / ]**: Adjust the **Volume** of the current cell only.
+*   *Note: In-Place edits provide a "Live Preview," immediately updating the OPL2 hardware so you can hear the change.*
 
-### 4. Editing Commands
-*   **Backspace / Delete:** Clear the current cell (sets Note, Instrument, and Volume to zero).
-*   **Tilde ( ` ):** Insert **Note Off** (`===`). This stops the sound on that channel during playback.
-*   **F5:** **Instrument Pick.** Samples the instrument ID from the current cell and sets it as your active "brush."
-
-### 5. Instrument & Octave Management
-*   **F1 / F2:** Decrease / Increase the base Octave for the piano keys.
-*   **F3 / F4:** Previous / Next Instrument. 
-    *   *Wraps around* from `00` to `FF` for fast access to percussion kits at the end of the bank.
-
-### 6. Volume Control
-*   **[** (Left Bracket): Decrease current volume.
-*   **]** (Right Bracket): Increase current volume.
-*   **Range:** 00 (Silent) to 3F (Max Volume).
+### 4. Transport & Navigation
+*   **F6 / F7**: Play-Pause / Stop-Reset.
+*   **Arrow Keys**: Navigate the 9-channel pattern grid.
+*   **Spacebar**: Toggle **Edit Mode** (Red Cursor = Recording, Blue Cursor = Navigation).
+*   **Backspace / Delete**: Clear the current cell.
+*   **Tilde ( ` )**: Insert **Note Off** (`===`).
+*   **F5**: **Instrument Pick.** Samples the instrument ID from the grid into your global brush.
 
 ---
 
 ## 🖥 User Interface Guide
 
-The screen is divided into the **Dashboard** (top) and the **Pattern Grid** (bottom).
+### Dashboard & Grid
+The screen is split into a **Dashboard** (top) and the **Pattern Grid** (bottom).
+*   **Blue Cursor:** Navigation Mode.
+*   **Red Cursor:** Record Mode.
+*   **Yellow Glow:** Highlights the active data cell (Note, Instrument, or Volume).
+*   **Dark Grey Bars:** Every 4th row is highlighted (Row 0, 4, 8, etc.) to help track musical bars.
 
-### Visual Indicators
-*   **Blue Cursor:** You are in **Navigation Mode**.
-*   **Red Cursor:** You are in **Record Mode**. Any notes played will be written to the current pattern.
-*   **Yellow Glow:** The specific data cell (Note/Inst/Vol) currently targeted by the cursor.
-*   **Dark Grey Bars:** Every 4th row (0, 4, 8, etc.) is highlighted to indicate the musical "Bar" and assist with timing.
-
-### Color Coding (Syntax Highlighting)
-To make the dense grid readable, data is color-coded by type:
-*   **White:** Musical Notes (e.g., `C-4`, `G#2`).
+### Syntax Highlighting
+*   **White:** Musical Notes (e.g., `C-4`).
 *   **Muted Purple:** Instrument Index (00-FF).
 *   **Muted Green:** Volume Level (00-3F).
-*   **Cyan:** Row Numbers and Static Headers.
+*   **Cyan:** Headers and Row Numbers.
 
 ---
 
 ## 🛠 Memory Architecture
-
-- **Patterns:** Stored in XRAM starting at `$0000`. Each pattern uses 2,304 bytes.
-- **Instrument Bank:** 256 AdLib-compatible patches stored in 6502 Internal RAM for instant access.
-- **Video Buffer:** VGA Mode 1 (3-bytes per pixel) located at `$C000`.
+- **Patterns:** XRAM `$0000`. 2,304 bytes per 64-row pattern.
+- **Instruments:** 256 patches in 6502 RAM.
+- **Video:** VGA Mode 1 at `$C000`.
 
 ---
 *Developed for the RP6502 Picocomputer Project.*
