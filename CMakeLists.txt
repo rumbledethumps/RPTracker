@@ -7,7 +7,7 @@ find_package(llvm-mos-sdk REQUIRED)
 
 project(MY-RP6502-PROJECT C CXX ASM)
 
-# Define the option (Default is OFF/FPGA)
+# Define the option (Default is OFF/FPGA)  -- maybe I should make this ON by default?
 option(USE_NATIVE_OPL2 "Use the RIA native OPL2 support" OFF)
 
 if(USE_NATIVE_OPL2)
