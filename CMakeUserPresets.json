@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "jason-local",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "/Users/rowe/Software/rp6502/llvm-mos",
+        "LLVM_MOS_PLATFORM": "rp6502",
+        "Python3_FIND_VIRTUALENV": "FIRST",
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
+      }
+    }
+  ]
+}

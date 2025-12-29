@@ -7,12 +7,16 @@ find_package(llvm-mos-sdk REQUIRED)
 
 project(MY-RP6502-PROJECT C CXX ASM)
 
-add_executable(hello)
-rp6502_executable(hello
+add_executable(RPTracker)
+rp6502_executable(RPTracker
     DATA file
     RESET file
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.hlp
 )
-target_sources(hello PRIVATE
+target_sources(RPTracker PRIVATE
     src/main.c
+    src/display.c
+    src/input.c
+    src/instruments.c
+    src/opl.c
 )
