@@ -58,8 +58,8 @@ void init_patterns(void) {
     RIA.addr0 = 0x0000; // Start of Pattern Data
     RIA.step0 = 1;
     
-    // Clear 20KB to be safe (covers 8+ patterns)
-    for (uint16_t i = 0; i < 20480; i++) {
+    // Clear up to 0xC000 (49,152 bytes).  This is space reserved for patterns.
+    for (uint16_t i = 0; i < 49152; i++) {
         RIA.rw0 = 0; 
     }
 }
