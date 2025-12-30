@@ -9,7 +9,7 @@
 #ifdef USE_NATIVE_OPL2
 // F-Number table for Octave 4 @ 3.58 MHz
 const uint16_t fnum_table[12] = {
-    277, 293, 311, 329, 349, 370, 392, 415, 440, 466, 493, 523
+    345, 365, 387, 410, 435, 460, 488, 517, 547, 580, 615, 651
 };
 #else
 // F-Number table for Octave 4 @ 4.0 MHz
