@@ -436,6 +436,7 @@ void refresh_all_ui(void) {
     clear_top_ui();      // Wipes rows 0-27 in XRAM
     draw_ui_dashboard(); // Redraws the boxes, headers, and labels
     update_dashboard();  // Redraws all current hex values and names
+    draw_headers();      // Redraws the grid headers (CH0, CH1, etc.)
     render_grid();       // Redraws the 32-row pattern grid (Row 28-59)
     update_cursor_visuals(cur_row, cur_row, cur_channel, cur_channel); // Restores cursor highlight
 }
