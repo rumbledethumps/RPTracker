@@ -20,9 +20,7 @@ uint8_t cur_channel = 0;    // 0-8
 bool edit_mode = false;     // Are we recording?
 
 void write_cell(uint8_t pat, uint8_t row, uint8_t chan, PatternCell *cell) {
-    // 2304 bytes per pattern (64 rows * 9 channels * 4 bytes)
-    uint16_t addr = PATTERN_XRAM_BASE + (pat * 2304) + (row * 36) + (chan * 4);
-    RIA.addr0 = addr;
+    RIA.addr0 = get_pattern_xram_addr(pat, row, chan);
     RIA.step0 = 1;
     RIA.rw0 = cell->note;
     RIA.rw0 = cell->inst;
@@ -31,12 +29,11 @@ void write_cell(uint8_t pat, uint8_t row, uint8_t chan, PatternCell *cell) {
 }
 
 void read_cell(uint8_t pat, uint8_t row, uint8_t chan, PatternCell *cell) {
-    uint16_t addr = PATTERN_XRAM_BASE + (pat * 2304) + (row * 36) + (chan * 4);
-    RIA.addr0 = addr;
+    RIA.addr0 = get_pattern_xram_addr(pat, row, chan);
     RIA.step0 = 1;
-    cell->note   = RIA.rw0;
-    cell->inst   = RIA.rw0;
-    cell->vol    = RIA.rw0;
+    cell->note = RIA.rw0;
+    cell->inst = RIA.rw0;
+    cell->vol = RIA.rw0;
     cell->effect = RIA.rw0;
 }
 

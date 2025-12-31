@@ -14,9 +14,6 @@ uint8_t current_octave = 3; // Adjusts in jumps of 12
 uint8_t active_midi_note = 0;      // Tracks the currently playing note
 uint8_t current_volume = 63; // Max volume (0x3F)
 
-// Buffer to hold one full pattern (32 rows * 9 channels * 4 bytes)
-#define PATTERN_SIZE 1152U 
-
 uint16_t get_pattern_xram_addr(uint8_t pat, uint8_t row, uint8_t chan) {
     return (uint16_t)pat * PATTERN_SIZE + (uint16_t)row * 36U + (uint16_t)chan * 4U;
 }
@@ -515,35 +512,45 @@ void handle_song_order_input() {
 }
 
 void pattern_copy(uint8_t pat_idx) {
-    // Force unsigned 16-bit math to prevent "Negative Address" wrap-around
-    uint16_t xram_addr = (uint16_t)pat_idx * 1152U;
-    uint16_t note_count = 0;
+    uint16_t start_addr = get_pattern_xram_addr(pat_idx, 0, 0);
+    uint16_t data_found = 0;
 
-    RIA.addr0 = xram_addr;
+    RIA.addr0 = start_addr;
     RIA.step0 = 1;
 
-    for (uint16_t i = 0; i < 1152; i++) {
+    for (uint16_t i = 0; i < PATTERN_SIZE; i++) {
         uint8_t b = RIA.rw0;
         pattern_clipboard[i] = b;
-        if (b != 0) note_count++;
+        if (b != 0) data_found++;
     }
-    
-    printf("Pattern %02X Copied. (Found %u data bytes)\n", pat_idx, note_count);
+    printf("Pattern %02X Copied (%u bytes)\n", pat_idx, data_found);
 }
 
 void pattern_paste(uint8_t pat_idx) {
-    uint16_t xram_addr = (uint16_t)pat_idx * 1152U;
+    uint16_t start_addr = get_pattern_xram_addr(pat_idx, 0, 0);
 
-    RIA.addr0 = xram_addr;
+    RIA.addr0 = start_addr;
     RIA.step0 = 1;
 
-    for (uint16_t i = 0; i < 1152; i++) {
+    for (uint16_t i = 0; i < PATTERN_SIZE; i++) {
         RIA.rw0 = pattern_clipboard[i];
     }
     
-    // Immediate UI Update
-    render_grid(); 
-    update_cursor_visuals(cur_row, cur_row, cur_channel, cur_channel);
-    
+    // Force the current view to sync if we pasted into the active pattern
+    if (pat_idx == cur_pattern) {
+        render_grid();
+        update_cursor_visuals(cur_row, cur_row, cur_channel, cur_channel);
+    }
     printf("Pattern %02X Pasted.\n", pat_idx);
+}
+
+void OPL_Panic(void) {
+    for (uint8_t i = 0; i < 9; i++) {
+        // Clear bit 5 (Key-On) for all 9 channels
+        // We write 0x00 to registers $B0 through $B8
+        OPL_Write(0xB0 + i, 0x00);
+    }
+    
+    // Reset our "keyboard memory" so the next piano press works cleanly
+    active_midi_note = 0; 
 }

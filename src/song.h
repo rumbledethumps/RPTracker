@@ -9,7 +9,8 @@ extern uint16_t song_length;
 extern bool is_song_mode;
 extern bool is_dialog_active;
 extern bool is_saving;
-extern char dialog_buffer[21]; // 8.3 filename + null terminator
+extern char dialog_buffer[13]; // 8.3 filename + null terminator
+extern char active_filename[13]; // Current loaded filename
 extern uint8_t dialog_pos;
 
 extern void update_order_display();

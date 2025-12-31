@@ -114,6 +114,11 @@ int main(void)
         // --- INPUT STAGE ---
         handle_input(); // This MUST update keystates AND prev_keystates
 
+        if (key_pressed(KEY_ESC)) {
+            OPL_Panic();
+            printf("PANIC: All notes killed.\n");
+        }
+
         if (is_dialog_active) {
             handle_filename_input();
         } else 

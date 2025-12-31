@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Buffer to hold one full pattern (32 rows * 9 channels * 4 bytes)
+#define PATTERN_SIZE 1152U 
+
 #define is_shift_down() (key(KEY_LEFTSHIFT) || key(KEY_RIGHTSHIFT))
 #define is_ctrl_down()  (key(KEY_LEFTCTRL)  || key(KEY_RIGHTCTRL))
 #define is_alt_down()   (key(KEY_LEFTALT)   || key(KEY_RIGHTALT))
@@ -41,5 +44,8 @@ extern void change_pattern(int8_t delta);
 extern void handle_song_order_input(void);
 extern void pattern_copy(uint8_t pattern_id);
 extern void pattern_paste(uint8_t pattern_id);
+extern void OPL_Panic();
+
+extern uint16_t get_pattern_xram_addr(uint8_t pat, uint8_t row, uint8_t chan);
 
 #endif

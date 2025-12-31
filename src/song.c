@@ -16,7 +16,8 @@ uint8_t cur_order_idx = 0; // Where we are in the playlist
 uint16_t song_length = 1;   // Total number of patterns in the song
 bool is_song_mode = false;   // Default to Pattern Mode
 
-char dialog_buffer[21] = "NEWSONG.RPT";
+char dialog_buffer[13] = "NEWSONG.RPT";
+char active_filename[13] = "UNTITLED.RPT"; // 8.3 format + null terminator
 uint8_t dialog_pos = 0; // Current cursor position in the string
 bool is_saving = false;
 bool is_dialog_active = false;
@@ -103,6 +104,14 @@ void save_song(const char* filename) {
     }
 
     close(fd);
+
+    // Update the active filename global
+    strncpy(active_filename, filename, 12);
+    active_filename[12] = '\0';
+
+    // Refresh everything
+    refresh_all_ui(); 
+
     printf("Saved: %s\n", filename);
 }
 
@@ -129,6 +138,13 @@ void load_song(const char* filename) {
     // read_xram handles the busy-wait internally
     read_xram(0x0000, 0x4800, fd);
     read_xram(0xB000, 0x0100, fd);
+
+    // Update the active filename global
+    strncpy(active_filename, filename, 12);
+    active_filename[12] = '\0';
+
+    // Refresh everything
+    refresh_all_ui(); 
 
     close(fd);
 
