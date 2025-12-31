@@ -39,5 +39,7 @@ extern void modify_instrument(int8_t delta);
 extern void modify_note(int8_t delta);
 extern void change_pattern(int8_t delta);
 extern void handle_song_order_input(void);
+extern void pattern_copy(uint8_t pattern_id);
+extern void pattern_paste(uint8_t pattern_id);
 
 #endif

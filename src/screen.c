@@ -306,6 +306,7 @@ void draw_ui_dashboard(void) {
     draw_string(2, 21, "F1/F2: Octave  F3/F4: Ins   F5: Pick  F6: Play", HUD_COL_CYAN, HUD_COL_BG);
     draw_string(2, 22, "F8: Mode    F9/10: Pattern  F11/12: Sequence", HUD_COL_CYAN, HUD_COL_BG);
     draw_string(2, 23, "[ / ]: Vol  - / =: Transp.  Space: Record", HUD_COL_CYAN, HUD_COL_BG);
+    draw_string(2, 24, "Ctrl+C: Copy Pat  Ctrl+V: Paste Pat", HUD_COL_CYAN, HUD_COL_BG);
     
     draw_string(55, 20, "[ SYSTEM ]", HUD_COL_YELLOW, HUD_COL_BG);
     draw_string(56, 21, "CPU: 8.0MHz", HUD_COL_WHITE, HUD_COL_BG);
@@ -402,4 +403,13 @@ void update_meters(void) {
         // Meter Bar: [##########]
         draw_meter(61, 8 + i, ch_peaks[i]);
     }
+}
+
+
+void refresh_all_ui(void) {
+    clear_top_ui();      // Wipes rows 0-27 in XRAM
+    draw_ui_dashboard(); // Redraws the boxes, headers, and labels
+    update_dashboard();  // Redraws all current hex values and names
+    render_grid();       // Redraws the 32-row pattern grid (Row 28-59)
+    update_cursor_visuals(cur_row, cur_row, cur_channel, cur_channel); // Restores cursor highlight
 }

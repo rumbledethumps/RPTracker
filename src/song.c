@@ -1,13 +1,25 @@
 #include <rp6502.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "constants.h"
 #include "screen.h"
 #include "song.h"
+#include "player.h"
+#include "input.h"
+#include <string.h>
+#include "usb_hid_keys.h"
 
 uint8_t cur_order_idx = 0; // Where we are in the playlist
 uint16_t song_length = 1;   // Total number of patterns in the song
 bool is_song_mode = false;   // Default to Pattern Mode
+
+char dialog_buffer[21] = "NEWSONG.RPT";
+uint8_t dialog_pos = 0; // Current cursor position in the string
+bool is_saving = false;
+bool is_dialog_active = false;
 
 void write_order_xram(uint8_t index, uint8_t pattern_id) {
     // 1. Point the RIA to the Order List + the specific slot
@@ -65,3 +77,134 @@ void update_order_display() {
         }
     }
 }
+
+void save_song(const char* filename) {
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC);
+    if (fd < 0) {
+        printf("Error: Open failed\n");
+        return;
+    }
+
+    // 1. Save Metadata (8 bytes from 6502 RAM)
+    write(fd, "RPT1", 4);
+    write(fd, &current_octave, 1);
+    write(fd, &current_volume, 1);
+    write(fd, &song_length, 2);
+
+    // 2. Save Patterns from XRAM $0000 (18432 bytes)
+    // The SDK function write_xram handles the busy-wait and opcodes for you!
+    if (write_xram(0x0000, 0x4800, fd) < 0) {
+        printf("Error writing patterns\n");
+    }
+
+    // 3. Save Order List from XRAM $B000 (256 bytes)
+    if (write_xram(0xB000, 0x0100, fd) < 0) {
+        printf("Error writing sequence\n");
+    }
+
+    close(fd);
+    printf("Saved: %s\n", filename);
+}
+
+void load_song(const char* filename) {
+    int fd = open(filename, O_RDONLY);
+    if (fd < 0) {
+        printf("Error: File not found\n");
+        return;
+    }
+
+    char head[4];
+    if (read(fd, head, 4) != 4 || head[0] != 'R') {
+        printf("Error: Invalid file\n");
+        close(fd);
+        return;
+    }
+
+    // Read Metadata back into 6502 RAM
+    read(fd, &current_octave, 1);
+    read(fd, &current_volume, 1);
+    read(fd, &song_length, 2);
+
+    // Load bulk data directly back into XRAM
+    // read_xram handles the busy-wait internally
+    read_xram(0x0000, 0x4800, fd);
+    read_xram(0xB000, 0x0100, fd);
+
+    close(fd);
+
+    // Sync UI
+    cur_order_idx = 0;
+    cur_pattern = read_order_xram(0);
+    cur_row = 0;
+    refresh_all_ui();
+    printf("Loaded: %s\n", filename);
+}
+
+void handle_filename_input() {
+    // 1. Draw the Dialog Box (Centered in the Operator area)
+    const uint8_t box_x = 20, box_y = 10;
+    draw_string(box_x, box_y,     "+----------------------------------+", HUD_COL_WHITE, HUD_COL_BLUE);
+    draw_string(box_x, box_y + 1, "| ENTER FILENAME (8.3 FORMAT):     |", HUD_COL_WHITE, HUD_COL_BLUE);
+    draw_string(box_x, box_y + 2, "|                                  |", HUD_COL_WHITE, HUD_COL_BLUE);
+    draw_string(box_x, box_y + 3, "| [ENTER] CONFIRM    [ESC] CANCEL  |", HUD_COL_WHITE, HUD_COL_BLUE);
+    draw_string(box_x, box_y + 4, "+----------------------------------+", HUD_COL_WHITE, HUD_COL_BLUE);
+    
+    // Draw the current string inside the box
+    draw_string(box_x + 2, box_y + 2, "                    ", HUD_COL_WHITE, HUD_COL_BG); // Clear line
+    draw_string(box_x + 2, box_y + 2, dialog_buffer, HUD_COL_YELLOW, HUD_COL_BG);
+
+    // 2. Handle Keyboard Edges
+    // We scan all keys to see if a new character was pressed
+    for (uint16_t k = 0; k < 256; k++) {
+        if (key_pressed(k)) {
+            // Check for Characters
+            char c = scancode_to_ascii(k);
+            if (c != 0 && dialog_pos < 12) { // 12 chars max for 8.3 + safety
+                dialog_buffer[dialog_pos++] = c;
+                dialog_buffer[dialog_pos] = '\0';
+            }
+            
+            // Check for Backspace
+            if (k == KEY_BACKSPACE && dialog_pos > 0) {
+                dialog_buffer[--dialog_pos] = '\0';
+            }
+
+            // Check for Cancel
+            if (k == KEY_ESC) {
+                is_dialog_active = false;
+                refresh_all_ui(); // Clear the box and restore the dashboard
+                draw_ui_dashboard(); // Refresh to hide box
+                return;
+            }
+
+            // Check for Confirm
+            if (k == KEY_ENTER) {
+                if (is_saving) save_song(dialog_buffer);
+                else load_song(dialog_buffer);
+                
+                is_dialog_active = false;
+                refresh_all_ui(); // Clear the box and restore the dashboard
+                draw_ui_dashboard();
+                return;
+            }
+        }
+    }
+}
+
+char scancode_to_ascii(uint8_t code) {
+    // Letters A-Z (HID 0x04 - 0x1D)
+    if (code >= 0x04 && code <= 0x1D) {
+        return 'A' + (code - 0x04);
+    }
+    // Numbers 1-9 (HID 0x1E - 0x26)
+    if (code >= 0x1E && code <= 0x26) {
+        return '1' + (code - 0x1E);
+    }
+    // Number 0 (HID 0x27)
+    if (code == 0x27) return '0';
+    // Dot/Period (HID 0x37)
+    if (code == 0x37) return '.';
+    
+    return 0; // Not a character we care about
+}
+

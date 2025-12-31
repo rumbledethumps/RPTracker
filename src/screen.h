@@ -37,5 +37,6 @@ extern void draw_string(uint8_t x, uint8_t y, const char* s, uint8_t fg, uint8_t
 extern void draw_hex_byte(uint16_t vga_addr, uint8_t val);
 extern void set_text_color(uint8_t x, uint8_t y, uint8_t len, uint8_t fg, uint8_t bg);
 extern void update_meters(void);
+extern void refresh_all_ui(void);
 
 #endif // SCREEN_H

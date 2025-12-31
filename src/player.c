@@ -1,3 +1,4 @@
+#include <rp6502.h>
 #include "player.h"
 #include "opl.h"
 #include "input.h"
@@ -12,6 +13,15 @@ uint8_t current_instrument = 0; // Instrument index (0 = Piano)
 uint8_t current_octave = 3; // Adjusts in jumps of 12
 uint8_t active_midi_note = 0;      // Tracks the currently playing note
 uint8_t current_volume = 63; // Max volume (0x3F)
+
+// Buffer to hold one full pattern (32 rows * 9 channels * 4 bytes)
+#define PATTERN_SIZE 1152U 
+
+uint16_t get_pattern_xram_addr(uint8_t pat, uint8_t row, uint8_t chan) {
+    return (uint16_t)pat * PATTERN_SIZE + (uint16_t)row * 36U + (uint16_t)chan * 4U;
+}
+static uint8_t pattern_clipboard[PATTERN_SIZE];
+static bool clipboard_full = false;
 
 SequencerState seq = {false, 6, 0, 125};
 
@@ -51,6 +61,23 @@ void player_tick(void) {
     bool note_pressed_this_frame = false;
     uint8_t target_note = 0;
     uint8_t semitone = 0;
+
+    // If Ctrl is held, we check for shortcuts and then STOP processing.
+    // Clipboard operations
+    if (is_ctrl_down()) {
+        if (key_pressed(KEY_C)) {
+            pattern_copy(cur_pattern);
+        }
+        if (key_pressed(KEY_V)) {
+            pattern_paste(cur_pattern);
+        }
+        
+        if (active_midi_note != 0) {
+            OPL_NoteOff(channel);
+            active_midi_note = 0;
+        }
+        return; 
+    }
 
     // 1. Scan for piano keys
     for (int k = 0; k < 256; k++) {
@@ -140,6 +167,7 @@ void player_tick(void) {
     // Pattern Change: F9 and F10
     if (key_pressed(KEY_F9)) change_pattern(-1);
     if (key_pressed(KEY_F10)) change_pattern(1);
+
 
     handle_song_order_input();
 
@@ -463,6 +491,7 @@ void handle_song_order_input() {
             if (song_length < MAX_ORDERS) song_length++; // Warning fixed by uint16_t
             update_dashboard();
         }
+
     }
     // 3. Just F11/F12: Navigate the Order List (Jump through the song)
     else {
@@ -483,4 +512,38 @@ void handle_song_order_input() {
             update_dashboard();
         }
     }
+}
+
+void pattern_copy(uint8_t pat_idx) {
+    // Force unsigned 16-bit math to prevent "Negative Address" wrap-around
+    uint16_t xram_addr = (uint16_t)pat_idx * 1152U;
+    uint16_t note_count = 0;
+
+    RIA.addr0 = xram_addr;
+    RIA.step0 = 1;
+
+    for (uint16_t i = 0; i < 1152; i++) {
+        uint8_t b = RIA.rw0;
+        pattern_clipboard[i] = b;
+        if (b != 0) note_count++;
+    }
+    
+    printf("Pattern %02X Copied. (Found %u data bytes)\n", pat_idx, note_count);
+}
+
+void pattern_paste(uint8_t pat_idx) {
+    uint16_t xram_addr = (uint16_t)pat_idx * 1152U;
+
+    RIA.addr0 = xram_addr;
+    RIA.step0 = 1;
+
+    for (uint16_t i = 0; i < 1152; i++) {
+        RIA.rw0 = pattern_clipboard[i];
+    }
+    
+    // Immediate UI Update
+    render_grid(); 
+    update_cursor_visuals(cur_row, cur_row, cur_channel, cur_channel);
+    
+    printf("Pattern %02X Pasted.\n", pat_idx);
 }

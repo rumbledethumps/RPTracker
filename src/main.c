@@ -6,6 +6,8 @@
 #include "opl.h"
 #include "player.h"
 #include "screen.h"
+#include "song.h"
+#include "usb_hid_keys.h"
 
 unsigned text_message_addr;         // Text message address
 
@@ -112,35 +114,56 @@ int main(void)
         // --- INPUT STAGE ---
         handle_input(); // This MUST update keystates AND prev_keystates
 
-        // Check Transport (Play/Stop)
-        handle_transport_controls();
-
-        handle_navigation();
-        handle_editing(); // Check for backspace/delete
-
-        // The Sequencer "Heartbeat"
-        sequencer_step();
-
-        player_tick();
-
-        // Always animate the meters every frame
-        update_meters();
-        
-        // --- UI REFRESH: Row or Channel Movement
-        if (cur_row != prev_row || cur_channel != prev_chan) {
-            update_cursor_visuals(prev_row, cur_row, prev_chan, cur_channel);
-            
-            // SYNC: Ensure the OPL2 hardware channel we just moved into 
-            // is loaded with our current "brush" instrument.
-            if (cur_channel != prev_chan) {
-                OPL_SetPatch(cur_channel, &gm_bank[current_instrument]);
+        if (is_dialog_active) {
+            handle_filename_input();
+        } else 
+        {
+            // Check for Shortcuts
+            if (is_ctrl_down()) {
+                if (key_pressed(KEY_S)) {
+                    is_dialog_active = true;
+                    is_saving = true;
+                    dialog_pos = 0;
+                    dialog_buffer[0] = '\0'; // Start with empty string
+                }
+                if (key_pressed(KEY_O)) {
+                    is_dialog_active = true;
+                    is_saving = false;
+                    dialog_pos = 0;
+                    dialog_buffer[0] = '\0';
+                }
             }
-        }
 
-        // If something changed the instrument, octave, or edit mode
-        // we refresh the dashboard values.
-        if (edit_mode != prev_edit_mode) {
-            update_dashboard(); 
+            // Check Transport (Play/Stop)
+            handle_transport_controls();
+
+            handle_navigation();
+            handle_editing(); // Check for backspace/delete
+
+            // The Sequencer "Heartbeat"
+            sequencer_step();
+
+            player_tick();
+
+            // Always animate the meters every frame
+            update_meters();
+            
+            // --- UI REFRESH: Row or Channel Movement
+            if (cur_row != prev_row || cur_channel != prev_chan) {
+                update_cursor_visuals(prev_row, cur_row, prev_chan, cur_channel);
+                
+                // SYNC: Ensure the OPL2 hardware channel we just moved into 
+                // is loaded with our current "brush" instrument.
+                if (cur_channel != prev_chan) {
+                    OPL_SetPatch(cur_channel, &gm_bank[current_instrument]);
+                }
+            }
+
+            // If something changed the instrument, octave, or edit mode
+            // we refresh the dashboard values.
+            if (edit_mode != prev_edit_mode) {
+                update_dashboard(); 
+            }
         }
 
     }
