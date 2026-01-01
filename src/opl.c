@@ -135,14 +135,17 @@ void OPL_SetVolume(uint8_t chan, uint8_t velocity) {
 }
 
 void OPL_Init() {
-    // 1. Silence all 9 channels immediately (Key-Off)
+
+    OPL_ShadowReset();
+
+    // Silence all 9 channels immediately (Key-Off)
     // Register 0xB0-0xB8 controls Key-On
     for (uint8_t i = 0; i < 9; i++) {
         OPL_Write(0xB0 + i, 0x00);
         shadow_b0[i] = 0;
     }
 
-    // 2. Wipe every OPL2 hardware register (0x01 to 0xF5)
+    // Wipe every OPL2 hardware register (0x01 to 0xF5)
     // This ensures that leftovers from a previous program 
     // (like long Release times or weird Waveforms) are gone.
     for (int i = 0x01; i <= 0xF5; i++) {
@@ -154,7 +157,7 @@ void OPL_Init() {
         shadow_b0[i] = 0;
     }
 
-    // 3. Re-enable the features we need
+    // Re-enable the features we need
     OPL_Write(0x01, 0x20); // Enable Waveform Select
     OPL_Write(0xBD, 0x00); // Ensure Melodic Mode
 }
