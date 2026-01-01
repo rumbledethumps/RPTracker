@@ -44,7 +44,8 @@ uint8_t shadow_ksl_c[9];
 // High Byte: 0x20 (KeyOn) | Block << 2 | F-Number High (2 bits)
 // Low Byte: F-Number Low (8 bits)
 uint16_t midi_to_opl_freq(uint8_t midi_note) {
-    if (midi_note < 12) midi_note = 12;
+    if (midi_note < 12) midi_note = 12;   // Lowest note is C-1
+    if (midi_note > 127) midi_note = 127; // Highest note is G9
     
     int block = (midi_note - 12) / 12;
     int note_idx = (midi_note - 12) % 12;
@@ -198,4 +199,24 @@ void OPL_Config(uint8_t enable, uint16_t addr) {
     xregn(2, 0, 0, 2, enable, addr);
 #endif
     
+}
+
+void OPL_SetPitch(uint8_t channel, uint8_t midi_note) {
+    if (channel > 8) return;
+
+    // Use your existing helper to calculate Block and F-Number
+    // High Byte: 0x20 (KeyOn) | Block << 2 | F-Number High (2 bits)
+    // Low Byte: F-Number Low (8 bits)
+    uint16_t freq = midi_to_opl_freq(midi_note);
+
+    // Write F-Number Low to $A0-$A8
+    OPL_Write(0xA0 + channel, freq & 0xFF);
+
+    // Write Block/F-Num High to $B0-$B8
+    // We force bit 5 (0x20) to 1 to ensure the note continues to sustain
+    uint8_t b_val = ((freq >> 8) & 0xFF) | 0x20;
+    OPL_Write(0xB0 + channel, b_val);
+    
+    // Update the logic shadow so NoteOff knows the last frequency used
+    shadow_b0[channel] = b_val & 0x1F; 
 }

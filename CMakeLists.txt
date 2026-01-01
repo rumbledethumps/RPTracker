@@ -31,4 +31,5 @@ target_sources(RPTracker PRIVATE
     src/player.c
     src/screen.c
     src/song.c
+    src/effects.c
 )

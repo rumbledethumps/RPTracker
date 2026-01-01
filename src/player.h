@@ -32,12 +32,14 @@ extern uint8_t current_octave;
 extern uint8_t current_instrument;
 extern uint8_t player_channel;
 extern uint8_t current_volume;
+extern bool effect_view_mode;
 
 extern void handle_navigation(void);
 extern void handle_transport_controls(void);
 extern void sequencer_step(void);
 extern void handle_editing(void);
-extern void modify_volume(int8_t delta);
+extern void modify_volume_effects(int8_t delta);
+extern void modify_effect_low_byte(int8_t delta);
 extern void modify_instrument(int8_t delta);
 extern void modify_note(int8_t delta);
 extern void change_pattern(int8_t delta);

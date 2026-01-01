@@ -20,12 +20,19 @@ uint8_t cur_channel = 0;    // 0-8
 bool edit_mode = false;     // Are we recording?
 
 void write_cell(uint8_t pat, uint8_t row, uint8_t chan, PatternCell *cell) {
+    // 1. Point to the start of the 5-byte cell in XRAM
     RIA.addr0 = get_pattern_xram_addr(pat, row, chan);
     RIA.step0 = 1;
+
+    // 2. Write the three 8-bit fields
     RIA.rw0 = cell->note;
     RIA.rw0 = cell->inst;
     RIA.rw0 = cell->vol;
-    RIA.rw0 = cell->effect;
+
+    // 3. Write the 16-bit effect as two 8-bit chunks
+    // We write Low Byte then High Byte (Standard 6502 Little-Endian)
+    RIA.rw0 = (uint8_t)(cell->effect & 0x00FF);
+    RIA.rw0 = (uint8_t)(cell->effect >> 8);
 }
 
 void read_cell(uint8_t pat, uint8_t row, uint8_t chan, PatternCell *cell) {
@@ -34,7 +41,10 @@ void read_cell(uint8_t pat, uint8_t row, uint8_t chan, PatternCell *cell) {
     cell->note = RIA.rw0;
     cell->inst = RIA.rw0;
     cell->vol = RIA.rw0;
-    cell->effect = RIA.rw0;
+    // 16-bit effect
+    uint8_t lo = RIA.rw0;
+    uint8_t hi = RIA.rw0;
+    cell->effect = (uint16_t)((hi << 8) | lo);
 }
 
 const char* const note_names[] = {
@@ -131,11 +141,8 @@ void render_row(uint8_t row_idx) {
         // Note (3 chars)
         if (cell->note == 0) {
             for(int i=0; i<3; i++) { RIA.rw0 = '.'; RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg; }
-        
             for(int i=0; i<2; i++) { RIA.rw0 = '.'; RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg; }
-
             for(int i=0; i<2; i++) { RIA.rw0 = '.'; RIA.rw0 = HUD_COL_SAGEGREEN; RIA.rw0 = bg; }
-
         } else {
             // const char* names[] = {"C-","C#","D-","D#","E-","F-","F#","G-","G#","A-","A#","B-"};
             uint8_t n = cell->note % 12;
@@ -144,13 +151,29 @@ void render_row(uint8_t row_idx) {
             RIA.rw0 = note_names[n][1]; RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
             RIA.rw0 = '0' + oct;   RIA.rw0 = HUD_COL_WHITE; RIA.rw0 = bg;
 
-            // Instrument (2 chars: Magenta)
-            RIA.rw0 = hex_chars[cell->inst >> 4];   RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
-            RIA.rw0 = hex_chars[cell->inst & 0x0F]; RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
+            if (!effect_view_mode) {
+                // Instrument (2 chars: Magenta)
+                RIA.rw0 = hex_chars[cell->inst >> 4];   RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[cell->inst & 0x0F]; RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
 
-            // Volume (2 chars: Green)
-            RIA.rw0 = hex_chars[cell->vol >> 4];    RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
-            RIA.rw0 = hex_chars[cell->vol & 0x0F];  RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
+                // Volume (2 chars: Green)
+                RIA.rw0 = hex_chars[cell->vol >> 4];    RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[cell->vol & 0x0F];  RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
+            } else {
+                // Effect (4 chars: Yellow)
+                RIA.rw0 = hex_chars[(cell->effect >> 12) & 0x0F]; RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[(cell->effect >> 8) & 0x0F];  RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[(cell->effect >> 4) & 0x0F];  RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[cell->effect & 0x0F];         RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
+            }
+
+            // // Instrument (2 chars: Magenta)
+            // RIA.rw0 = hex_chars[cell->inst >> 4];   RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
+            // RIA.rw0 = hex_chars[cell->inst & 0x0F]; RIA.rw0 = HUD_COL_DPURPLE; RIA.rw0 = bg;
+
+            // // Volume (2 chars: Green)
+            // RIA.rw0 = hex_chars[cell->vol >> 4];    RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
+            // RIA.rw0 = hex_chars[cell->vol & 0x0F];  RIA.rw0 = HUD_COL_SAGEGREEN;   RIA.rw0 = bg;
 
         }
 

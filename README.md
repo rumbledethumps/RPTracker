@@ -51,6 +51,13 @@ These keys adjust the settings used when recording **new** notes.
 *   **Ctrl + S**: **Save Song.** Opens a dialog to save the current song to the USB drive as an `.RPT` file.
 *   **Ctrl + O**: **Load Song.** Opens a dialog to load an `.RPT` file from the USB drive.
 
+### Effect Mode (Toggle with '/')
+*   **SHIFT + [ / ]** : Change Command (Digit 1 - `X000`)
+*   **[ / ]**       : Change Style   (Digit 2 - `0X00`)
+*   **' (Apostrophe)**: Increase Params (Digits 3 & 4 - `00XX`)
+*   **; (Semicolon)** : Decrease Params (Digits 3 & 4 - `00XX`)
+*   *Note: Hold SHIFT with ; or ' to jump by 0x10 for faster parameter scrolling.*
+
 ---
 
 ## 🖥 User Interface Guide

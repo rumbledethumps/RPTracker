@@ -7,6 +7,11 @@
 #include "screen.h"
 #include "instruments.h"
 #include "song.h"
+#include "effects.h"
+
+// UI Toggle: false = Volume/Instrument, true = 16-bit Effect
+bool effect_view_mode = false;
+
 
 // Current State
 uint8_t current_instrument = 0; // Instrument index (0 = Piano)
@@ -109,7 +114,12 @@ void player_tick(void) {
             active_midi_note = target_note;
 
             if (edit_mode) {
-                PatternCell c = {target_note, current_instrument, current_volume, 0};
+                // PatternCell c = {target_note, current_instrument, current_volume, 0};
+                PatternCell c;
+                read_cell(cur_pattern, cur_row, cur_channel, &c);
+                c.note = target_note;
+                c.inst = current_instrument;
+                c.vol  = current_volume;
                 write_cell(cur_pattern, cur_row, cur_channel, &c);
                 render_row(cur_row);
                 
@@ -150,9 +160,14 @@ void player_tick(void) {
         }
     }
 
-    // Volume: [ and ] (with Shift detection inside modify_volume)
-    if (key_pressed(KEY_LEFTBRACE))  modify_volume(-1);
-    if (key_pressed(KEY_RIGHTBRACE)) modify_volume(1);
+    // Volume / Effects: [ and ] (with Shift detection inside modify_volume_effects)
+    if (key_pressed(KEY_LEFTBRACE))  modify_volume_effects(-1);
+    if (key_pressed(KEY_RIGHTBRACE)) modify_volume_effects(1);
+
+    // Low-Byte Effect Parameters
+    // Using semicolon for Down and Apostrophe for Up (as they sit near each other)
+    if (key_pressed(KEY_SEMICOLON))      modify_effect_low_byte(-1);
+    if (key_pressed(KEY_APOSTROPHE))  modify_effect_low_byte(1);
     
     // Instrument: F3 and F4
     if (key_pressed(KEY_F3)) modify_instrument(-1);
@@ -172,6 +187,11 @@ void player_tick(void) {
     if (key_pressed(KEY_F9)) change_pattern(-1);
     if (key_pressed(KEY_F10)) change_pattern(1);
 
+    if (key_pressed(KEY_SLASH)) {
+        effect_view_mode = !effect_view_mode;
+        draw_headers(); // Update RN | NOTE EFFT label
+        render_grid();  // Swap columns on screen
+    }
 
     handle_song_order_input();
 
@@ -259,15 +279,39 @@ void sequencer_step(void) {
                 OPL_NoteOff(ch); 
                 // ch_peaks[ch] = 0; // Clear peak
                 if (cell.note != 255) {
+
+                    ch_arp[ch].base_note = cell.note; // Store for the arp engine
+
                     OPL_SetPatch(ch, &gm_bank[cell.inst]);
                     OPL_SetVolume(ch, cell.vol << 1); 
                     OPL_NoteOn(ch, cell.note);
                     ch_peaks[ch] = cell.vol; // Set peak for meter display
                 }
+
+                // --- PARSE 16-BIT EFFECT ---
+                // Format: 0x1 S D T (Arp, Style, Depth, Speed)
+                uint16_t eff = cell.effect;
+                uint8_t cmd = (eff >> 12) & 0x0F;
+
+                if (cmd == 1) { // Command 1 = Arpeggio
+                    ch_arp[ch].active = true;
+                    ch_arp[ch].style  = (eff >> 8) & 0x0F;
+                    ch_arp[ch].depth  = (eff >> 4) & 0x0F;
+                    ch_arp[ch].speed  = (eff & 0x0F);
+                } else if (cmd == 0 && eff != 0) {
+                    // Future commands (Portamento, etc.)
+                } else if (eff == 0) {
+                    ch_arp[ch].active = false; // 0000 kills the effect
+                }
             }
         }
 
-        // 2. ADVANCE SECOND: Move pointers forward for the NEXT frame
+        // --- LOGIC FOR EVERY VSYNC TICK ---
+        for (uint8_t ch = 0; ch < 9; ch++) {
+            process_arp_logic(ch);
+        }
+
+        // ADVANCE SECOND: Move pointers forward for the NEXT frame
         uint8_t old_row = cur_row;
         bool pattern_changed = false;
 
@@ -286,7 +330,7 @@ void sequencer_step(void) {
             }
         }
 
-        // 3. UI SYNC: Update the highlight bar
+        // UI SYNC: Update the highlight bar
         // We only call this once. It cleans up old_row and highlights new cur_row.
         update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
 
@@ -300,24 +344,24 @@ void sequencer_step(void) {
 void handle_transport_controls() {
     // F6: Play / Pause
     if (key_pressed(KEY_F6)) {
-    seq.is_playing = !seq.is_playing;
-    
-    if (seq.is_playing) {
-        seq.tick_counter = seq.ticks_per_row; 
-
-        // --- THE FIX ---
-        if (is_song_mode) {
-            // Sync to the song structure only if we are in SONG mode
-            cur_pattern = read_order_xram(cur_order_idx);
-            render_grid(); 
-        } 
-        // If is_song_mode is false, we don't touch cur_pattern.
-        // It stays on the pattern you were manually editing.
+        seq.is_playing = !seq.is_playing;
         
-        // ... Panic/Mute logic ...
+        if (seq.is_playing) {
+            seq.tick_counter = seq.ticks_per_row; 
+
+            // --- THE FIX ---
+            if (is_song_mode) {
+                // Sync to the song structure only if we are in SONG mode
+                cur_pattern = read_order_xram(cur_order_idx);
+                render_grid(); 
+            } 
+            // If is_song_mode is false, we don't touch cur_pattern.
+            // It stays on the pattern you were manually editing.
+            
+            // ... Panic/Mute logic ...
+        }
+        update_dashboard();
     }
-    update_dashboard();
-}
 
     // F7: Stop & Reset
     if (key_pressed(KEY_F7)) {
@@ -373,33 +417,68 @@ void handle_editing(void) {
     }
 }
 
-void modify_volume(int8_t delta) {
-    if (is_shift_down()) {
-        // --- IN-PLACE CELL EDIT ONLY ---
+void modify_volume_effects(int8_t delta) {
+    if (effect_view_mode) {
+        // --- 16-BIT EFFECT EDITING (High Byte) ---
         PatternCell cell;
         read_cell(cur_pattern, cur_row, cur_channel, &cell);
-        
-        // Apply delta to cell volume (bound 0-63)
-        int16_t new_vol = (int16_t)cell.vol + delta;
-        if (new_vol > 63) new_vol = 63;
-        if (new_vol < 0)  new_vol = 0;
-        cell.vol = (uint8_t)new_vol;
-        
+
+        if (is_shift_down()) {
+            // Highest Nibble (Command): 0x1000
+            // Example: 0100 -> 1100
+            cell.effect += (delta * 0x1000);
+        } 
+        else {
+            // Second Nibble (Style): 0x0100
+            // Example: 0100 -> 0200
+            cell.effect += (delta * 0x0100);
+        }
+
         write_cell(cur_pattern, cur_row, cur_channel, &cell);
-        render_row(cur_row); // Update the grid color immediately
-        
-        // Live Preview: Update the OPL2 hardware so you hear the change
-        OPL_SetVolume(cur_channel, cell.vol << 1);
+        render_row(cur_row);
     } 
     else {
-        // --- GLOBAL BRUSH EDIT ONLY ---
-        int16_t new_brush_vol = (int16_t)current_volume + delta;
-        if (new_brush_vol > 63) new_brush_vol = 63;
-        if (new_brush_vol < 0)  new_brush_vol = 0;
-        current_volume = (uint8_t)new_brush_vol;
-        
-        update_dashboard(); // Update the "VOL" hex at the top
+        // --- VOLUME EDITING ---
+        if (is_shift_down()) {
+            // In-place Cell Volume Edit
+            PatternCell cell;
+            read_cell(cur_pattern, cur_row, cur_channel, &cell);
+            
+            int16_t v = (int16_t)cell.vol + delta;
+            if (v > 63) v = 63; if (v < 0) v = 0;
+            cell.vol = (uint8_t)v;
+            
+            write_cell(cur_pattern, cur_row, cur_channel, &cell);
+            render_row(cur_row);
+            
+            // Live Preview
+            OPL_SetVolume(cur_channel, cell.vol << 1);
+        } 
+        else {
+            // Global Brush Volume Edit
+            int16_t v = (int16_t)current_volume + delta;
+            if (v > 63) v = 63; if (v < 0) v = 0;
+            current_volume = (uint8_t)v;
+            update_dashboard();
+        }
     }
+}
+
+void modify_effect_low_byte(int8_t delta) {
+    PatternCell cell;
+    read_cell(cur_pattern, cur_row, cur_channel, &cell);
+
+    // Apply delta to the bottom 8 bits (0x00FF)
+    // Shift increases the step to help scroll through 00-FF faster
+    int16_t step = is_shift_down() ? (delta * 16) : delta;
+    
+    uint8_t lo = (uint8_t)(cell.effect & 0xFF);
+    lo += (uint8_t)step;
+    
+    cell.effect = (cell.effect & 0xFF00) | lo;
+
+    write_cell(cur_pattern, cur_row, cur_channel, &cell);
+    render_row(cur_row);
 }
 
 void modify_instrument(int8_t delta) {
@@ -578,4 +657,25 @@ void OPL_Panic(void) {
     
     // Reset our "keyboard memory" so the next piano press works cleanly
     active_midi_note = 0; 
+}
+
+void modify_effect(int8_t delta) {
+    PatternCell cell;
+    read_cell(cur_pattern, cur_row, cur_channel, &cell);
+
+    if (is_shift_down()) {
+        // COARSE: Change the High Byte (Command/Sub-type)
+        // This makes it easy to jump between 1x, 2x, etc.
+        uint8_t hi = (uint8_t)(cell.effect >> 8);
+        hi += delta;
+        cell.effect = (uint16_t)(hi << 8) | (cell.effect & 0x00FF);
+    } else {
+        // FINE: Change the Low Byte (Parameter values)
+        uint8_t lo = (uint8_t)(cell.effect & 0xFF);
+        lo += delta;
+        cell.effect = (cell.effect & 0xFF00) | lo;
+    }
+
+    write_cell(cur_pattern, cur_row, cur_channel, &cell);
+    render_row(cur_row);
 }
