@@ -238,38 +238,11 @@ void sequencer_step(void) {
 
     if (seq.tick_counter >= seq.ticks_per_row) {
         seq.tick_counter = 0;
-        uint8_t old_row = cur_row;
-
-        // if (cur_row < 31) cur_row++; else cur_row = 0;
-        if (cur_row < 31) {
-            cur_row++;
-        } else {
-            // END OF PATTERN: Move to next step in the playlist
-            cur_row = 0;
-            
-            if (is_song_mode) {
-            cur_order_idx++;
-
-                // Loop the song if we hit the end of the defined length
-                if (cur_order_idx >= song_length) {
-                    cur_order_idx = 0;
-                }
-
-                // Get the pattern ID for this new step
-                cur_pattern = read_order_xram(cur_order_idx);
-
-                // Refresh the whole grid for the new pattern
-                render_grid();
-                // update_dashboard();
-            }
-            
-        }
-
-        update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
-        if (cur_row == 0) update_dashboard(); // Refresh if pattern or order changed
-
+        
+        // 1. SOUND FIRST: Play the notes on the CURRENT row
+        // This ensures Row 0 plays when you start, and visuals stay in sync.
         for (uint8_t ch = 0; ch < 9; ch++) {
-            // Priority: If the user is jamming on this channel, don't play sequenced note
+            // Priority: Keyboard jamming overrides the sequencer
             if (ch == cur_channel && active_midi_note != 0) continue;
 
             PatternCell cell;
@@ -286,7 +259,34 @@ void sequencer_step(void) {
                 }
             }
         }
+
+        // 2. ADVANCE SECOND: Move pointers forward for the NEXT frame
+        uint8_t old_row = cur_row;
+        bool pattern_changed = false;
+
+        if (cur_row < 31) {
+            cur_row++;
+        } else {
+            // End of 32-row pattern reached
+            cur_row = 0;
+            if (is_song_mode) {
+                cur_order_idx++;
+                if (cur_order_idx >= song_length) cur_order_idx = 0;
+
+                cur_pattern = read_order_xram(cur_order_idx);
+                render_grid(); // Redraw the new pattern
+                pattern_changed = true;
+            }
+        }
+
+        // 3. UI SYNC: Update the highlight bar
+        // We only call this once. It cleans up old_row and highlights new cur_row.
         update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+
+        // Update the dashboard if we changed patterns or sequence slots
+        if (pattern_changed || cur_row == 0) {
+            update_dashboard();
+        }
     }
 }
 

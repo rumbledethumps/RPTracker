@@ -128,3 +128,128 @@
 24 --------------------------------------------------------------------------------
 25 F1/F2: OCTAVE ±   F3/F4: INSTRUMENT ±   F5: COPY INST   F6: PLAY/PAUSE  F7: STOP  
 26 F8: MODE         F9/F10: PATTERN ±  F11/12: SEQUENCE   
+
+
+void sequencer_step(void) {
+    if (!seq.is_playing) return;
+    seq.tick_counter++;
+
+    if (seq.tick_counter >= seq.ticks_per_row) {
+        seq.tick_counter = 0;
+        
+        // 1. SOUND FIRST: Play the notes on the CURRENT row
+        // This ensures Row 0 plays when you start, and visuals stay in sync.
+        for (uint8_t ch = 0; ch < 9; ch++) {
+            // Priority: Keyboard jamming overrides the sequencer
+            if (ch == cur_channel && active_midi_note != 0) continue;
+
+            PatternCell cell;
+            read_cell(cur_pattern, cur_row, ch, &cell);
+            
+            if (cell.note != 0) {
+                OPL_NoteOff(ch); 
+                if (cell.note != 255) {
+                    // Extract 4-bit volume from the high nibble
+                    uint8_t tracker_vol = (cell.vol_eff >> 4) & 0x0F;
+
+                    OPL_SetPatch(ch, &gm_bank[cell.inst]);
+                    OPL_SetVolume(ch, tracker_vol); 
+                    OPL_NoteOn(ch, cell.note);
+                    
+                    // Trigger visual meter
+                    ch_peaks[ch] = tracker_vol; 
+                }
+            }
+        }
+
+        // 2. ADVANCE SECOND: Move pointers forward for the NEXT frame
+        uint8_t old_row = cur_row;
+        bool pattern_changed = false;
+
+        if (cur_row < 31) {
+            cur_row++;
+        } else {
+            // End of 32-row pattern reached
+            cur_row = 0;
+            if (is_song_mode) {
+                cur_order_idx++;
+                if (cur_order_idx >= song_length) cur_order_idx = 0;
+
+                cur_pattern = read_order_xram(cur_order_idx);
+                render_grid(); // Redraw the new pattern
+                pattern_changed = true;
+            }
+        }
+
+        // 3. UI SYNC: Update the highlight bar
+        // We only call this once. It cleans up old_row and highlights new cur_row.
+        update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+
+        // Update the dashboard if we changed patterns or sequence slots
+        if (pattern_changed || cur_row == 0) {
+            update_dashboard();
+        }
+    }
+}
+
+
+
+
+
+void sequencer_step(void) {
+    if (!seq.is_playing) return;
+    seq.tick_counter++;
+
+    if (seq.tick_counter >= seq.ticks_per_row) {
+        seq.tick_counter = 0;
+        uint8_t old_row = cur_row;
+
+        // if (cur_row < 31) cur_row++; else cur_row = 0;
+        if (cur_row < 31) {
+            cur_row++;
+        } else {
+            // END OF PATTERN: Move to next step in the playlist
+            cur_row = 0;
+            
+            if (is_song_mode) {
+            cur_order_idx++;
+
+                // Loop the song if we hit the end of the defined length
+                if (cur_order_idx >= song_length) {
+                    cur_order_idx = 0;
+                }
+
+                // Get the pattern ID for this new step
+                cur_pattern = read_order_xram(cur_order_idx);
+
+                // Refresh the whole grid for the new pattern
+                render_grid();
+                // update_dashboard();
+            }
+            
+        }
+
+        update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+        if (cur_row == 0) update_dashboard(); // Refresh if pattern or order changed
+
+        for (uint8_t ch = 0; ch < 9; ch++) {
+            // Priority: If the user is jamming on this channel, don't play sequenced note
+            if (ch == cur_channel && active_midi_note != 0) continue;
+
+            PatternCell cell;
+            read_cell(cur_pattern, cur_row, ch, &cell);
+            
+            if (cell.note != 0) {
+                OPL_NoteOff(ch); 
+                // ch_peaks[ch] = 0; // Clear peak
+                if (cell.note != 255) {
+                    OPL_SetPatch(ch, &gm_bank[cell.inst]);
+                    OPL_SetVolume(ch, cell.vol << 1); 
+                    OPL_NoteOn(ch, cell.note);
+                    ch_peaks[ch] = cell.vol; // Set peak for meter display
+                }
+            }
+        }
+        update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+    }
+}
