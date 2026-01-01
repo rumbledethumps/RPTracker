@@ -65,26 +65,48 @@ The Arpeggio engine retriggers the note on every cycle step to ensure a crisp, c
 **Format: `1 S D T`**
 
 *   **1**: Command ID (Arpeggio).
-*   **S (Style)**: The movement pattern:
-    *   `0`: **Up** (Root -> +Depth)
-    *   `1`: **Down** (+Depth -> Root)
-    *   `2`: **Major 3rd** (Root -> +4 -> +7) - *Ignores D*
-    *   `3`: **Minor 3rd** (Root -> +3 -> +7) - *Ignores D*
-    *   `4`: **Climb** (Root -> +Depth -> +Depth*2)
-    *   `5`: **Octave** (Root -> +12 -> +24) - *Ignores D*
-    *   `6`: **Random** (Random offset using Depth)
-*   **D (Depth)**: The interval in semitones (0-F).
+*   **S (Style)**: The movement pattern (16 styles available):
+    
+    **Basic 2-Note Patterns:**
+    *   `0`: **UP** - Root, +Depth (classic oscillation)
+    *   `1`: **DOWN** - +Depth, Root (inverted oscillation)
+    *   `D`: **OCTAVE** - Root, +12 (octave jumps)
+    *   `E`: **FIFTH** - Root, +7 (power chord pattern)
+    
+    **Major/Minor Triads (4-Note with Octave):**
+    *   `2`: **MAJOR** - Root, +4, +7, +12 - *Ignores D*
+    *   `3`: **MINOR** - Root, +3, +7, +12 - *Ignores D*
+    *   `6`: **SUS4** - Root, +5, +7, +12 - *Ignores D*
+    *   `7`: **SUS2** - Root, +2, +7, +12 - *Ignores D*
+    *   `9`: **AUG** - Root, +4, +8, +12 (augmented) - *Ignores D*
+    
+    **7th Chords (4-Note):**
+    *   `4`: **MAJ7** - Root, +4, +7, +11 (jazzy) - *Ignores D*
+    *   `5`: **MIN7** - Root, +3, +7, +10 (bluesy) - *Ignores D*
+    *   `8`: **DIM** - Root, +3, +6, +9 (diminished tension) - *Ignores D*
+    
+    **Special Effects:**
+    *   `A`: **POWER** - Root, +7, +12, +12 (rock power chord) - *Ignores D*
+    *   `B`: **UPDOWN** - Root, +Depth, +Depth, Root (bounce pattern)
+    *   `C`: **UP3** - Root, +Depth, +Depth×2, +Depth×3 (climbing)
+    *   `F`: **DOUBLE** - Root, Root, +Depth, +Depth (stutter effect)
+
+*   **D (Depth)**: The interval in semitones (0-F). Used by styles 0, 1, B, C, F. Ignored by chord patterns.
 *   **T (Timing)**: How fast the notes cycle (mapped to a Musical LUT):
     *   `0-2`: High-speed "Buzz" (1-3 VSync frames)
-    *   `3`: **1 Step** (6 ticks)
-    *   `7`: **2 Steps** (12 ticks)
-    *   `B`: **1 Beat** (24 ticks)
-    *   `F`: **2 Bars** (16 steps / 96 ticks)
+    *   `3`: **1 Row** (6 ticks) - Perfect for 4-note chords in 32-row patterns
+    *   `4-6`: Mid-tempo (9-18 ticks)
+    *   `7`: **2 Rows** (24 ticks)
+    *   `B`: **4 Rows** (48 ticks)
+    *   `F`: **16 Rows** (96 ticks)
 
 **Usage:**
-- `10C3`: Standard octave flip (Up, 12 semitones, every 1 row step).
-- `1471`: Fast 3-step climb (0 -> 7 -> 14 semitones) every 2 frames.
-- `0000`: Stop all effects on the channel.
+- `12C3`: Major chord arpeggio, 1 row per note (4 rows/cycle, 8 cycles per pattern).
+- `13C3`: Minor chord arpeggio, 1 row per note.
+- `10C3`: Simple octave oscillation (Up, 12 semitones, every 1 row).
+- `14C3`: Jazzy Maj7 arpeggio.
+- `1AC1`: Fast power chord buzz effect.
+- `F000` or `0000`: Stop all effects on the channel.
 
 ---
 
