@@ -162,9 +162,9 @@ void render_row(uint8_t row_idx) {
             } else {
                 // Effect (4 chars: Yellow)
                 RIA.rw0 = hex_chars[(cell->effect >> 12) & 0x0F]; RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
-                RIA.rw0 = hex_chars[(cell->effect >> 8) & 0x0F];  RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
-                RIA.rw0 = hex_chars[(cell->effect >> 4) & 0x0F];  RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
-                RIA.rw0 = hex_chars[cell->effect & 0x0F];         RIA.rw0 = HUD_COL_YELLOW; RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[(cell->effect >> 8) & 0x0F];  RIA.rw0 = HUD_COL_RED; RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[(cell->effect >> 4) & 0x0F];  RIA.rw0 = HUD_COL_CYAN; RIA.rw0 = bg;
+                RIA.rw0 = hex_chars[cell->effect & 0x0F];         RIA.rw0 = HUD_COL_CYAN; RIA.rw0 = bg;
             }
 
             // // Instrument (2 chars: Magenta)

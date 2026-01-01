@@ -96,6 +96,7 @@ void player_tick(void) {
                 semitone = s;
                 target_note = (current_octave + 1) * 12 + semitone;
                 note_pressed_this_frame = true;
+                ch_arp[channel].active = false; // Keyboard input kills any background Arp
                 break; 
             }
         }
@@ -263,81 +264,72 @@ void sequencer_step(void) {
     if (!seq.is_playing) return;
     seq.tick_counter++;
 
+    // --- PHASE A: ROW UPDATE (Tick 0 only) ---
     if (seq.tick_counter >= seq.ticks_per_row) {
         seq.tick_counter = 0;
         
-        // 1. SOUND FIRST: Play the notes on the CURRENT row
-        // This ensures Row 0 plays when you start, and visuals stay in sync.
         for (uint8_t ch = 0; ch < 9; ch++) {
-            // Priority: Keyboard jamming overrides the sequencer
             if (ch == cur_channel && active_midi_note != 0) continue;
 
             PatternCell cell;
             read_cell(cur_pattern, cur_row, ch, &cell);
             
-            if (cell.note != 0) {
-                OPL_NoteOff(ch); 
-                // ch_peaks[ch] = 0; // Clear peak
-                if (cell.note != 255) {
+            // 1. Parse Arp Command (1SDT)
+            uint16_t eff = cell.effect;
+            uint8_t cmd = (eff >> 12) & 0x0F;
 
-                    ch_arp[ch].base_note = cell.note; // Store for the arp engine
+            if (cmd == 1) { 
+                ch_arp[ch].active = true;
+                ch_arp[ch].style  = (eff >> 8) & 0x0F;
+                ch_arp[ch].depth  = (eff >> 4) & 0x0F;
+                ch_arp[ch].speed_idx = (eff & 0x0F);
+                
+                // Set the target duration from our new LUT
+                ch_arp[ch].target_ticks = arp_tick_lut[ch_arp[ch].speed_idx];
+            } 
 
-                    OPL_SetPatch(ch, &gm_bank[cell.inst]);
-                    OPL_SetVolume(ch, cell.vol << 1); 
-                    OPL_NoteOn(ch, cell.note);
-                    ch_peaks[ch] = cell.vol; // Set peak for meter display
-                }
-
-                // --- PARSE 16-BIT EFFECT ---
-                // Format: 0x1 S D T (Arp, Style, Depth, Speed)
-                uint16_t eff = cell.effect;
-                uint8_t cmd = (eff >> 12) & 0x0F;
-
-                if (cmd == 1) { // Command 1 = Arpeggio
-                    ch_arp[ch].active = true;
-                    ch_arp[ch].style  = (eff >> 8) & 0x0F;
-                    ch_arp[ch].depth  = (eff >> 4) & 0x0F;
-                    ch_arp[ch].speed  = (eff & 0x0F);
-                } else if (cmd == 0 && eff != 0) {
-                    // Future commands (Portamento, etc.)
-                } else if (eff == 0) {
-                    ch_arp[ch].active = false; // 0000 kills the effect
-                }
+            if (cell.note == 255) {
+                ch_arp[ch].active = false; // Note-Off kills Arp
+            }
+            else if (cell.note > 0) {
+                // New Note: Re-sync Arp phase so the first note hits on the beat
+                ch_arp[ch].base_note = cell.note;
+                ch_arp[ch].inst = cell.inst;
+                ch_arp[ch].vol = cell.vol;
+                ch_arp[ch].phase_timer = 0;
+                ch_arp[ch].step_toggle = 0;
+                
+                // Standard OPL Note Trigger
+                OPL_NoteOff(ch);
+                OPL_SetPatch(ch, &gm_bank[cell.inst]);
+                OPL_SetVolume(ch, cell.vol << 1); 
+                OPL_NoteOn(ch, cell.note);
+                ch_peaks[ch] = cell.vol;
             }
         }
 
-        // --- LOGIC FOR EVERY VSYNC TICK ---
-        for (uint8_t ch = 0; ch < 9; ch++) {
-            process_arp_logic(ch);
-        }
-
-        // ADVANCE SECOND: Move pointers forward for the NEXT frame
+        // --- Advance Pointers ---
         uint8_t old_row = cur_row;
         bool pattern_changed = false;
-
         if (cur_row < 31) {
             cur_row++;
         } else {
-            // End of 32-row pattern reached
             cur_row = 0;
             if (is_song_mode) {
                 cur_order_idx++;
                 if (cur_order_idx >= song_length) cur_order_idx = 0;
-
                 cur_pattern = read_order_xram(cur_order_idx);
-                render_grid(); // Redraw the new pattern
+                render_grid(); 
                 pattern_changed = true;
             }
         }
-
-        // UI SYNC: Update the highlight bar
-        // We only call this once. It cleans up old_row and highlights new cur_row.
         update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+        if (pattern_changed || cur_row == 0) update_dashboard();
+    }
 
-        // Update the dashboard if we changed patterns or sequence slots
-        if (pattern_changed || cur_row == 0) {
-            update_dashboard();
-        }
+    // This loop is the ONLY way Arps sound like Arps.
+    for (uint8_t ch = 0; ch < 9; ch++) {
+        process_arp_logic(ch);
     }
 }
 

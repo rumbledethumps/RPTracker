@@ -5,6 +5,7 @@
 #include "opl.h"
 #include "instruments.h"
 #include "constants.h"
+#include "effects.h"
 
 #ifdef USE_NATIVE_OPL2
 // F-Number table for Octave 4 @ 3.58 MHz
@@ -110,7 +111,11 @@ void OPL_NoteOn(uint8_t channel, uint8_t midi_note) {
 
 void OPL_NoteOff(uint8_t channel) {
     if (channel > 8) return;
-    OPL_Write(0xB0 + channel, shadow_b0[channel]); // Write stored octave/freq with KeyOn=0
+
+    // Kill the Arp logic for this channel immediately
+    // ch_arp[channel].active = false;
+
+    OPL_Write(0xB0 + channel, shadow_b0[channel] & 0x1F); // Write stored octave/freq with KeyOn=0
 }
 
 // Clear all 256 registers correctly

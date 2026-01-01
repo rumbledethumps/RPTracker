@@ -2,15 +2,21 @@
 #define EFFECTS_C
 
 typedef struct {
-    uint8_t base_note;  // The original note from the grid
-    uint8_t style;      // 0:Up, 1:Down, 2:Random
-    uint8_t depth;      // Semitones between steps
-    uint8_t speed;      // How many ticks per pitch change
-    bool active;        // Is an arp currently running on this channel?
+    uint8_t base_note;
+    uint8_t inst;
+    uint8_t vol;
+    uint8_t style;
+    uint8_t depth;
+    uint8_t speed_idx;   // The T nibble (0-F)
+    uint8_t target_ticks; // Value from LUT
+    uint8_t phase_timer;  // Accumulator
+    uint8_t step_toggle;  // 0 or 1
+    bool    active;
 } ArpState;
 
 extern ArpState ch_arp[9];
 
 extern void process_arp_logic(uint8_t ch);
+extern const uint8_t arp_tick_lut[16];
 
 #endif // EFFECTS_C

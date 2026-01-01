@@ -58,6 +58,34 @@ These keys adjust the settings used when recording **new** notes.
 *   **; (Semicolon)** : Decrease Params (Digits 3 & 4 - `00XX`)
 *   *Note: Hold SHIFT with ; or ' to jump by 0x10 for faster parameter scrolling.*
 
+### 🎹 Effect Command 1: Advanced Arpeggio (1SDT)
+RPTracker uses a 16-bit effect system (4 hex digits) when in Effect View (`/`).
+The Arpeggio engine retriggers the note on every cycle step to ensure a crisp, chiptune attack.
+
+**Format: `1 S D T`**
+
+*   **1**: Command ID (Arpeggio).
+*   **S (Style)**: The movement pattern:
+    *   `0`: **Up** (Root -> +Depth)
+    *   `1`: **Down** (+Depth -> Root)
+    *   `2`: **Major 3rd** (Root -> +4 -> +7) - *Ignores D*
+    *   `3`: **Minor 3rd** (Root -> +3 -> +7) - *Ignores D*
+    *   `4`: **Climb** (Root -> +Depth -> +Depth*2)
+    *   `5`: **Octave** (Root -> +12 -> +24) - *Ignores D*
+    *   `6`: **Random** (Random offset using Depth)
+*   **D (Depth)**: The interval in semitones (0-F).
+*   **T (Timing)**: How fast the notes cycle (mapped to a Musical LUT):
+    *   `0-2`: High-speed "Buzz" (1-3 VSync frames)
+    *   `3`: **1 Step** (6 ticks)
+    *   `7`: **2 Steps** (12 ticks)
+    *   `B`: **1 Beat** (24 ticks)
+    *   `F`: **2 Bars** (16 steps / 96 ticks)
+
+**Usage:**
+- `10C3`: Standard octave flip (Up, 12 semitones, every 1 row step).
+- `1471`: Fast 3-step climb (0 -> 7 -> 14 semitones) every 2 frames.
+- `0000`: Stop all effects on the channel.
+
 ---
 
 ## 🖥 User Interface Guide
