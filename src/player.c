@@ -11,6 +11,7 @@
 
 // UI Toggle: false = Volume/Instrument, true = 16-bit Effect
 bool effect_view_mode = false;
+uint16_t last_effect[9] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 
 
 // Current State
@@ -264,7 +265,6 @@ void sequencer_step(void) {
     if (!seq.is_playing) return;
     seq.tick_counter++;
 
-    // --- PHASE A: ROW UPDATE (Tick 0 only) ---
     if (seq.tick_counter >= seq.ticks_per_row) {
         seq.tick_counter = 0;
         
@@ -274,41 +274,55 @@ void sequencer_step(void) {
             PatternCell cell;
             read_cell(cur_pattern, cur_row, ch, &cell);
             
-            // 1. Parse Arp Command (1SDT)
-            uint16_t eff = cell.effect;
-            uint8_t cmd = (eff >> 12) & 0x0F;
+            // --- 1. IDEMPOTENT EFFECT PARSING ---
+            if (cell.effect != last_effect[ch]) {
+                uint16_t eff = cell.effect;
+                uint8_t cmd = (eff >> 12) & 0x0F;
 
-            if (cmd == 1) { 
-                ch_arp[ch].active = true;
-                ch_arp[ch].style  = (eff >> 8) & 0x0F;
-                ch_arp[ch].depth  = (eff >> 4) & 0x0F;
-                ch_arp[ch].speed_idx = (eff & 0x0F);
-                
-                // Set the target duration from our new LUT
-                ch_arp[ch].target_ticks = arp_tick_lut[ch_arp[ch].speed_idx];
-            } 
-
-            if (cell.note == 255) {
-                ch_arp[ch].active = false; // Note-Off kills Arp
+                if (cmd == 1) { 
+                    ch_arp[ch].active = true;
+                    ch_arp[ch].style  = (eff >> 8) & 0x0F;
+                    ch_arp[ch].depth  = (eff >> 4) & 0x0F;
+                    ch_arp[ch].speed_idx = (eff & 0x0F);
+                    ch_arp[ch].target_ticks = arp_tick_lut[ch_arp[ch].speed_idx];
+                    
+                    // ONLY reset phase if the command actually changed
+                    ch_arp[ch].phase_timer = 0;
+                    ch_arp[ch].step_index = 0;
+                } else if (eff == 0xF000 || (cell.note != 0 && cmd == 0)) {
+                    ch_arp[ch].active = false;
+                }
+                last_effect[ch] = cell.effect; // Update shadow
             }
-            else if (cell.note > 0) {
-                // New Note: Re-sync Arp phase so the first note hits on the beat
-                ch_arp[ch].base_note = cell.note;
-                ch_arp[ch].inst = cell.inst;
-                ch_arp[ch].vol = cell.vol;
-                ch_arp[ch].phase_timer = 0;
-                ch_arp[ch].step_toggle = 0;
-                
-                // Standard OPL Note Trigger
-                OPL_NoteOff(ch);
-                OPL_SetPatch(ch, &gm_bank[cell.inst]);
-                OPL_SetVolume(ch, cell.vol << 1); 
-                OPL_NoteOn(ch, cell.note);
-                ch_peaks[ch] = cell.vol;
+
+            // --- 2. TRIGGER NOTE WITH OFFSET ---
+            if (cell.note != 0) {
+                OPL_NoteOff(ch); 
+                if (cell.note != 255) {
+                    ch_arp[ch].base_note = cell.note;
+                    ch_arp[ch].inst = cell.inst;
+                    ch_arp[ch].vol  = cell.vol;
+                    
+                    // If we just triggered a new note, we reset the phase 
+                    // so the melody remains predictable/on-beat.
+                    ch_arp[ch].phase_timer = 0;
+                    ch_arp[ch].step_index = 0;
+
+                    // Calculate starting offset (Style 1 "Down" starts high!)
+                    int16_t start_offset = 0;
+                    if (ch_arp[ch].active) {
+                        start_offset = get_arp_offset(ch_arp[ch].style, ch_arp[ch].depth, 0);
+                    }
+
+                    OPL_SetPatch(ch, &gm_bank[cell.inst]);
+                    OPL_SetVolume(ch, cell.vol << 1); 
+                    OPL_NoteOn(ch, cell.note + start_offset);
+                    ch_peaks[ch] = cell.vol;
+                }
             }
         }
 
-        // --- Advance Pointers ---
+        // --- Advance Row / UI Pointers ---
         uint8_t old_row = cur_row;
         bool pattern_changed = false;
         if (cur_row < 31) {
@@ -327,7 +341,7 @@ void sequencer_step(void) {
         if (pattern_changed || cur_row == 0) update_dashboard();
     }
 
-    // This loop is the ONLY way Arps sound like Arps.
+    // --- PHASE B: PER-VSYNC TICK ---
     for (uint8_t ch = 0; ch < 9; ch++) {
         process_arp_logic(ch);
     }
@@ -365,6 +379,11 @@ void handle_transport_controls() {
             // ch_peaks[i] = 0; // Clear peak
         }
         
+        for (int i=0; i<9; i++) {
+            last_effect[i] = 0xFFFF;
+            ch_arp[i].active = false;
+        }
+
         // Reset to beginning
         uint8_t old = cur_row;
         cur_row = 0;
