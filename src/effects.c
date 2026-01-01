@@ -36,10 +36,13 @@ int16_t get_arp_offset(uint8_t style, uint8_t depth, uint8_t index) {
 void process_arp_logic(uint8_t ch) {
     if (!ch_arp[ch].active) return;
 
-    // --- TICK 0 GUARD ---
-    // The sequencer handles the strike on Tick 0. 
-    // We only process mid-row re-triggers here.
-    if (seq.tick_counter == 0) return;
+    // --- JUST TRIGGERED GUARD ---
+    // If this arpeggio was just activated or a note was just struck,
+    // skip processing this frame to avoid double-hit.
+    if (ch_arp[ch].just_triggered) {
+        ch_arp[ch].just_triggered = false;
+        return;
+    }
 
     ch_arp[ch].phase_timer++;
 

@@ -12,6 +12,7 @@ typedef struct {
     uint8_t phase_timer;  // Accumulator
     uint8_t step_index;  
     bool    active;
+    bool    just_triggered; // Prevents double-hit on same frame
 } ArpState;
 
 extern ArpState ch_arp[9];

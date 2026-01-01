@@ -289,6 +289,7 @@ void sequencer_step(void) {
                     // ONLY reset phase if the command actually changed
                     ch_arp[ch].phase_timer = 0;
                     ch_arp[ch].step_index = 0;
+                    ch_arp[ch].just_triggered = true; // Mark as just started
                 } else if (eff == 0xF000 || (cell.note != 0 && cmd == 0)) {
                     ch_arp[ch].active = false;
                 }
@@ -307,6 +308,7 @@ void sequencer_step(void) {
                     // so the melody remains predictable/on-beat.
                     ch_arp[ch].phase_timer = 0;
                     ch_arp[ch].step_index = 0;
+                    ch_arp[ch].just_triggered = true; // Prevent immediate re-trigger
 
                     // Calculate starting offset (Style 1 "Down" starts high!)
                     int16_t start_offset = 0;
