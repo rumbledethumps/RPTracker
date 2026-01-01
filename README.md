@@ -398,6 +398,132 @@ Adds richness and width to sounds without full semitone shifts.
 
 ---
 
+## 🎚️ Combining Effects
+
+Effects in RPTracker can run simultaneously or sequentially, but some combinations have specific behaviors and limitations.
+
+### ✅ Compatible Combinations (Run Simultaneously)
+
+These effects work together and can create complex, layered sounds:
+
+**Arpeggio + Volume Control:**
+```
+Row 00: C-3 00 3F 12C3  ← Major arpeggio starts
+Row 04: ... .. .. 3130  ← Volume slide down (arpeggio keeps running)
+Row 08: ... .. .. 0000  ← Empty row (both effects continue)
+```
+
+**Arpeggio + Tremolo:**
+```
+Row 00: C-3 00 3F 12C3  ← Major arpeggio
+Row 01: ... .. .. 8440  ← Add tremolo (pitch + volume oscillation)
+```
+
+**Portamento + Volume Slide:**
+```
+Row 00: C-3 00 3F 2046  ← Slide up 4 semitones
+Row 02: ... .. .. 3020  ← Fade in while sliding
+```
+
+**Vibrato + Tremolo:**
+```
+Row 00: C-3 00 3F 4420  ← Vibrato on note
+Row 01: ... .. .. 8440  ← Add tremolo (rich modulation)
+```
+
+**Any Effect + Note Cut:**
+```
+Row 00: C-3 00 3F 12C3  ← Major arpeggio
+Row 04: ... .. .. 5006  ← Cut after 6 ticks (stops arp cleanly)
+```
+
+### ❌ Mutually Exclusive Effects
+
+These effects cannot run simultaneously - activating one disables the other:
+
+**Arpeggio ⟷ Vibrato:**
+```
+Row 00: C-3 00 3F 12C3  ← Arpeggio starts
+Row 04: ... .. .. 4420  ← Vibrato replaces arpeggio
+```
+- Both modulate pitch but use different techniques.
+- Code explicitly disables arpeggio when starting vibrato and vice versa.
+
+**Arpeggio ⟷ Portamento:**
+```
+Row 00: C-3 00 3F 12C3  ← Arpeggio starts
+Row 04: ... .. .. 2046  ← Portamento replaces arpeggio
+```
+- Portamento kills arpeggio when activated.
+
+### ⚠️ Effects That Retrigger Notes
+
+These effects restart the note, interrupting any running pitch-based effects:
+
+**Portamento** - Continuously retriggers as it steps through semitones
+**Fine Pitch (9XXX)** - Immediately retriggers on parse
+**Note Delay (6XXX)** - Retriggers when delay timer expires
+**Retrigger (7XXX)** - Explicitly designed to retrigger repeatedly
+
+**Example - Fine Pitch Interrupts Arpeggio:**
+```
+Row 00: C-3 00 3F 12C3  ← Major arpeggio starts
+Row 04: ... .. .. 9002  ← Fine pitch retriggers note, stops arpeggio!
+```
+
+**Better Approach - Stop First:**
+```
+Row 00: C-3 00 3F 12C3  ← Major arpeggio
+Row 04: ... .. .. F000  ← Stop all effects
+Row 05: C-3 00 3F 9002  ← New note with fine pitch
+```
+
+### 🎵 Effect Persistence Rules
+
+1. **Effects persist across empty rows** until explicitly changed or stopped.
+2. **Use `F000` to stop all effects** on a channel.
+3. **Use `0000` on empty rows** to indicate "no change" (effects continue).
+4. **New note without effect** (`cmd == 0`) stops all effects except when specified.
+
+**Example - Long-Running Effect:**
+```
+Row 00: C-3 00 3F 4420  ← Vibrato starts
+Row 01: ... .. .. 0000  ← Empty (vibrato continues)
+Row 02: ... .. .. 0000  ← Empty (vibrato continues)
+Row 03: ... .. .. 0000  ← Empty (vibrato continues)
+Row 04: ... .. .. F000  ← Stop vibrato
+```
+
+### 💡 Advanced Combinations
+
+**Layered Modulation (Multiple Channels):**
+```
+Chan 0: C-3 00 3F 12C3  ← Major arpeggio
+Chan 1: E-3 00 3F 9002  ← Detuned major third (chorus)
+Chan 2: G-3 00 3F 900E  ← Detuned fifth (wide chord)
+```
+
+**Dynamic Arpeggio:**
+```
+Row 00: C-3 00 3F 12C3  ← Major arpeggio at full volume
+Row 08: ... .. .. 3130  ← Fade out while arpeggating
+Row 10: ... .. .. 5006  ← Cut cleanly
+```
+
+**Rhythmic Texture:**
+```
+Row 00: C-3 00 3F 7003  ← Retrigger every 3 ticks
+Row 04: ... .. .. 8240  ← Add tremolo for pulsing rolls
+```
+
+**Delayed Harmony:**
+```
+Row 00: C-3 00 3F 0000  ← Base note
+Row 00: ... .. .. 6743  ← Delay +7 semitones, 4 ticks (harmony echo)
+```
+
+---
+
 ## 🎼 Instrument Bank
 RPTracker includes a 256-instrument GM-compatible OPL2 patch bank loaded from **gm_bank[]** in [instruments.c](src/instruments.c).
 Each instrument is an **OPL_Patch** struct containing 11 registers that define the FM synthesis parameters.
