@@ -1,8 +1,7 @@
 # RPTracker (v0.3)
 ### A Native 6502 Music Tracker for the RP6502 (Picocomputer)
 
-**RPTracker** is a high-performance music composition tool designed for the [RP6502 Picocomputer](https://github.com/picocomputer). It features a 640x480 VGA interface and targets both the **Native RIA OPL2** emulation and the **FPGA OPL2** sound card. It provides a classic "tracker" workflow with modern high-resolution visual feedback.
-
+**RPTracker** is a music composition tool designed for the [RP6502 Picocomputer](https://github.com/picocomputer). It features a 640x480 VGA interface and targets both the **Native RIA OPL2** emulation and the **FPGA OPL2** sound card. It provides a classic "tracker" workflow with modern high-resolution visual feedback.
 
 ![Screen Shot](images/Tracker_screenshot.png)
 
@@ -23,7 +22,7 @@ These keys adjust the settings used when recording **new** notes.
 *   **F5**: **Instrument Pick.** Samples the Note, Instrument, and Volume from the grid into your current Brush.
 
 ### 3. Transport & Navigation
-*   **Arrow Keys**: Navigate the pattern grid.
+*   **Arrow Keys**: Navigate the 9-channel pattern grid.
 *   **ENTER**: **Play / Pause.** Starts playback from the current cursor position.
 *   **SHIFT + ENTER**: **Stop & Reset.** Resets playback to the start of the pattern/song and silences all voices.
 *   **F6**: **Toggle Follow Mode.** 
@@ -35,15 +34,16 @@ These keys adjust the settings used when recording **new** notes.
 *   **Spacebar**: Toggle **Edit Mode**.
     *   *Blue Cursor:* Navigation only. Piano keys play sounds for preview.
     *   *Red Cursor:* Record Mode. Piano keys enter data and auto-advance.
-*   **Backspace / Delete**: Clear the current cell.
-*   **Tilde ( ` )**: Insert **Note Off** (`===`).
+*   **Backspace / Delete**: Clear the current cell (wipes Note, Ins, Vol, and Effect).
+*   **Grave ( ` )**: Insert **Note Off** (`===`) and **Kill Effect** (`F000`).
 *   **- / =**: **Transpose** the note in the current cell by **1 semitone**.
 *   **SHIFT + - / =**: **Transpose** the current cell by **12 semitones (1 Octave)**.
+*   **ALT + - / =**: **Transpose Column.** Transposes the entire channel in the current pattern.
 *   **SHIFT + F3 / F4**: Change the **Instrument** of the current cell only.
 *   **SHIFT + [ / ]**: Adjust the **Volume** of the current cell only.
 
 ### 5. Pattern & Sequence Management
-*   **F9 / F10**: Jump to Previous / Next **Pattern ID**.
+*   **F9 / F10**: Jump to Previous / Next **Pattern ID** (The pattern currently on screen).
 *   **F11 / F12**: Jump to Previous / Next **Sequence Slot** (Playlist position).
 *   **SHIFT + F11 / F12**: Change the **Pattern ID** assigned to the current Sequence Slot.
 *   **ALT + F11 / F12**: Decrease / Increase total **Song Length**.
@@ -51,18 +51,22 @@ These keys adjust the settings used when recording **new** notes.
 ### 6. Clipboard & Files
 *   **Ctrl + C**: **Copy** the current 32-row pattern to the internal RAM clipboard.
 *   **Ctrl + V**: **Paste** the clipboard into the current pattern (overwrites existing data).
-*   **Ctrl + S**: **Save Song.** Opens a dialog to save the current song to the USB drive as an `.RPT` file.
-*   **Ctrl + O**: **Load Song.** Opens a dialog to load an `.RPT` file from the USB drive.
+*   **Ctrl + S**: **Save Song.** Opens a dialog to save the song to USB as an `.RPT` (v2) file.
+*   **Ctrl + O**: **Load Song.** Opens a dialog to load an `.RPT` file from USB.
 
-### Effect Mode (Toggle with '/')
-*   **SHIFT + [ / ]** : Change Command (Digit 1 - `X000`)
-*   **[ / ]**       : Change Style   (Digit 2 - `0X00`)
-*   **' (Apostrophe)**: Increase Params (Digits 3 & 4 - `00XX`)
-*   **; (Semicolon)** : Decrease Params (Digits 3 & 4 - `00XX`)
-*   *Note: Hold SHIFT with ; or ' to jump by 0x10 for faster parameter scrolling.*
+---
+
+## 🛠 Effect Mode (Toggle with '/')
+
+When in Effect Mode, the Instrument and Volume columns are replaced by a **4-digit Hex Effect** (`CSDT`). Each digit is edited independently to prevent value carry-over.
+
+*   **SHIFT + [ / ]** : Change **Command** (Digit 1 - `X000`)
+*   **[ / ]**       : Change **Style**   (Digit 2 - `0X00`)
+*   **SHIFT + ' / ;**: Change **Param Hi** (Digit 3 - `00X0`)
+*   **' / ;**       : Change **Param Lo** (Digit 4 - `000X`)
 
 ### 🎹 Effect Command 1: Advanced Arpeggio (1SDT)
-RPTracker uses a 16-bit effect system (4 hex digits) when in Effect View (`/`). The Arpeggio engine retriggers the note on every cycle step to ensure a crisp, high-speed attack.
+The Arpeggio engine retriggers the note on every cycle step to ensure a crisp, high-speed attack.
 
 **Format: `1 S D T`**
 
@@ -113,8 +117,7 @@ RPTracker uses a 16-bit effect system (4 hex digits) when in Effect View (`/`). 
 ---
 
 ### 🎶 Effect Command 2: Portamento (2SDT)
-Portamento creates smooth pitch slides between notes, adding expression and fluidity to melodies.
-The effect continuously steps through semitones until reaching the target note.
+Portamento creates smooth pitch slides between notes. The effect continuously steps through semitones until reaching the target.
 
 **Format: `2 S D T`**
 
@@ -150,8 +153,7 @@ The effect continuously steps through semitones until reaching the target note.
 ---
 
 ### 🎚️ Effect Command 3: Volume Slide (3SDT)
-Volume Slide creates smooth dynamic changes - fade-ins, fade-outs, crescendos, and swells.
-The effect continuously adjusts volume each tick until reaching the target.
+Volume Slide uses 8.8 fixed-point math to create perfectly smooth fades.
 
 **Format: `3 S D T`**
 
