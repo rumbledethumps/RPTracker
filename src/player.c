@@ -342,31 +342,27 @@ void sequencer_step(void) {
                     // D = Speed (volume units per tick)
                     // T = Target volume (0-F represents 0-63 scaled)
                     
-                    // Determine starting volume: use vol on this row if present, else use current vol
-                    uint8_t start_vol = (cell.note != 0 && cell.note != 255) ? cell.vol : ch_arp[ch].vol;
-                    uint8_t start_note = (cell.note != 0 && cell.note != 255) ? cell.note : ch_arp[ch].base_note;
-                    uint8_t start_inst = (cell.note != 0 && cell.note != 255) ? cell.inst : ch_arp[ch].inst;
-                    
-                    ch_volslide[ch].current_vol = start_vol;
-                    ch_volslide[ch].base_note = start_note;
-                    ch_volslide[ch].inst = start_inst;
-                    
+                    uint16_t eff = cell.effect;
+                    uint8_t s_nibble = (eff >> 8) & 0x0F; // Mode
+                    uint8_t d_nibble = (eff >> 4) & 0x0F; // Speed (1-F)
+                    uint8_t t_nibble = (eff & 0x0F);      // Target (0-F)
+
                     ch_volslide[ch].active = true;
-                    ch_volslide[ch].mode = (eff >> 8) & 0x0F;
-                    ch_volslide[ch].speed = ((eff >> 4) & 0x0F);
-                    if (ch_volslide[ch].speed == 0) ch_volslide[ch].speed = 1;
-                    
-                    // Target volume: scale from 0-F to 0-63
-                    uint8_t target_nibble = (eff & 0x0F);
-                    ch_volslide[ch].target_vol = (target_nibble * 63) / 15;
-                    ch_volslide[ch].tick_counter = 0;
-                    
-                    // For modes 0 and 1, if target is 0, slide to limit
-                    if (ch_volslide[ch].mode == 0 && target_nibble == 0) {
-                        ch_volslide[ch].target_vol = 63; // Slide up to max
-                    } else if (ch_volslide[ch].mode == 1 && target_nibble == 0) {
-                        ch_volslide[ch].target_vol = 0; // Slide down to silence
-                    }
+                    ch_volslide[ch].mode = s_nibble;
+
+                    // 1. Start from current row's volume (0-63)
+                    ch_volslide[ch].vol_accum = (uint16_t)cell.vol << 8;
+
+                    // 2. Scale 0-F target to 0-63
+                    ch_volslide[ch].target_vol = (t_nibble * 63) / 15;
+
+                    // 3. Set Speed: 84 is the "Magic Number" for ~32 rows at Speed 1
+                    if (d_nibble == 0) d_nibble = 1;
+                    ch_volslide[ch].speed_fp = (uint16_t)d_nibble * 84U;
+
+                    // 4. Default targets for Mode 0 (Up) and 1 (Down) if T is 0
+                    if (s_nibble == 0 && t_nibble == 0) ch_volslide[ch].target_vol = 63;
+                    if (s_nibble == 1 && t_nibble == 0) ch_volslide[ch].target_vol = 0;
                 } else if (cmd == 4) {
                     // Vibrato: 4RDT
                     // R = Rate (ticks per phase step - lower = faster)
@@ -711,10 +707,28 @@ void handle_editing(void) {
     }
 
     if (key_pressed(KEY_GRAVE)) {
-        PatternCell off = {255, current_instrument, 0, 0};
+        // 1. Create the 'Kill' cell
+        PatternCell off;
+        off.note = 255;               // Note Off (===)
+        off.inst = current_instrument; // Keep current instrument for context
+        off.vol  = 0;                 // Silence
+        off.effect = 0xF000;          // NEW: Kill Effect command
+
+        // 2. Write to XRAM and Update Screen
         write_cell(cur_pattern, cur_row, cur_channel, &off);
         render_row(cur_row);
-        if (cur_row < 31) cur_row++; 
+
+        // 3. Auto-advance with Wrapping (consistent with piano input)
+        uint8_t old_row = cur_row;
+        if (cur_row < 31) {
+            cur_row++;
+        } else {
+            cur_row = 0; // Wrap 1F -> 00
+        }
+
+        // 4. Visual Refresh
+        update_cursor_visuals(old_row, cur_row, cur_channel, cur_channel);
+        mark_playhead(play_row);
     }
 }
 
@@ -775,21 +789,27 @@ void modify_effect_low_byte(int8_t delta) {
     PatternCell cell;
     read_cell(cur_pattern, cur_row, cur_channel, &cell);
 
-    // Determine the step (1 or 16)
-    uint8_t step = is_shift_down() ? 16 : 1;
-    
-    // Extract only the low byte
-    uint8_t lo = (uint8_t)(cell.effect & 0xFF);
-    
-    if (delta > 0) {
-        lo += step; // Wraps 0xFF to 0x00 automatically
-    } else {
-        lo -= step; // Wraps 0x00 to 0xFF automatically
+    // Split the 16-bit effect into its two 8-bit halves
+    uint8_t hi_byte = (uint8_t)(cell.effect >> 8);
+    uint8_t lo_byte = (uint8_t)(cell.effect & 0xFF);
+
+    if (is_shift_down()) {
+        // --- EDITING DIGIT 3 (High nibble of the low byte: 00X0) ---
+        // Example: 1F -> 0F (if decreasing)
+        uint8_t val = (lo_byte >> 4);      // Extract high nibble
+        val = (val + delta) & 0x0F;        // Add and wrap 0-F
+        lo_byte = (val << 4) | (lo_byte & 0x0F); // Re-insert
+    } 
+    else {
+        // --- EDITING DIGIT 4 (Low nibble of the low byte: 000X) ---
+        // Example: 1F -> 10 (if increasing)
+        uint8_t val = (lo_byte & 0x0F);    // Extract low nibble
+        val = (val + delta) & 0x0F;        // Add and wrap 0-F
+        lo_byte = (lo_byte & 0xF0) | val;  // Re-insert
     }
 
-    // Mask out the old low byte and insert the new one
-    // (cell.effect & 0xFF00) preserves Digits 1 and 2
-    cell.effect = (cell.effect & 0xFF00) | lo;
+    // Re-pack the modified low byte back into the 16-bit effect
+    cell.effect = ((uint16_t)hi_byte << 8) | lo_byte;
 
     write_cell(cur_pattern, cur_row, cur_channel, &cell);
     render_row(cur_row);

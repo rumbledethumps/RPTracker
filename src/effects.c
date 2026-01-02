@@ -204,78 +204,58 @@ void process_portamento_logic(uint8_t ch) {
 void process_volume_slide_logic(uint8_t ch) {
     if (!ch_volslide[ch].active) return;
 
-    ch_volslide[ch].tick_counter++;
+    uint16_t v = ch_volslide[ch].vol_accum;
+    uint16_t step = ch_volslide[ch].speed_fp;
+    uint16_t target_fp = (uint16_t)ch_volslide[ch].target_vol << 8;
+    bool reached = false;
 
-    // Slow down volume slide: process every 4 ticks for smoother OPL2 logarithmic volume
-    if (ch_volslide[ch].tick_counter < 4) return;
+    switch (ch_volslide[ch].mode) {
+        case 0: // SLIDE UP
+            v += step;
+            // Strict clamp at 63.0 (0x3F00) to prevent wrapping to 64
+            if (v >= 0x3F00) { v = 0x3F00; reached = true; }
+            if (v >= target_fp && ch_volslide[ch].target_vol != 0) { v = target_fp; reached = true; }
+            break;
 
-    ch_volslide[ch].tick_counter = 0;
-
-    uint8_t current = ch_volslide[ch].current_vol;
-    uint8_t target = ch_volslide[ch].target_vol;
-    uint8_t speed = ch_volslide[ch].speed;
-    if (speed == 0) speed = 1;
-    
-    // For OPL2 logarithmic volume, slow down by limiting step size
-    if (speed > 2) speed = 2; // Cap speed at 2 for smoother slides
-    
-    bool reached_target = false;
-
-    // Calculate next volume based on mode
-    if (ch_volslide[ch].mode == 0) { // Up
-        if (current + speed <= 63) {
-            current += speed;
-        } else {
-            current = 63;
-        }
-        if (target > 0 && current >= target) {
-            current = target;
-            reached_target = true;
-        }
-        if (current >= 63) {
-            reached_target = true;
-        }
-    } else if (ch_volslide[ch].mode == 1) { // Down
-        if (current >= speed) {
-            current -= speed;
-        } else {
-            current = 0;
-        }
-        if (target > 0 && current <= target) {
-            current = target;
-            reached_target = true;
-        }
-        if (current == 0) {
-            reached_target = true;
-        }
-    } else if (ch_volslide[ch].mode == 2) { // To Target
-        if (current < target) {
-            if (current + speed <= target) {
-                current += speed;
+        case 1: // SLIDE DOWN
+            if (v > step) {
+                v -= step;
+                if (v <= target_fp) { v = target_fp; reached = true; }
             } else {
-                current = target;
+                // Hits 0.0, prevent underflow
+                v = 0;
+                reached = true;
             }
-        } else if (current > target) {
-            if (current >= target + speed) {
-                current -= speed;
+            break;
+
+        case 2: // SLIDE TO TARGET (Auto-direction)
+            if (v < target_fp) {
+                v += step;
+                if (v >= target_fp) { v = target_fp; reached = true; }
+            } else if (v > target_fp) {
+                if (v > step) v -= step; else v = 0;
+                if (v <= target_fp) { v = target_fp; reached = true; }
             } else {
-                current = target;
+                reached = true;
             }
-        }
-        if (current == target) {
-            reached_target = true;
-        }
+            break;
     }
 
-    // Stop if reached target
-    if (reached_target) {
+    ch_volslide[ch].vol_accum = v;
+    
+    // Convert 8.8 Fixed Point to 0-63 Integer
+    uint8_t final_vol = (uint8_t)(v >> 8);
+
+    // --- AUDIO UPDATE ---
+    // We pass (0-63 << 1) to your routine to satisfy the 0-127 MIDI requirement
+    OPL_SetVolume(ch, final_vol << 1);
+    
+    // Update visual meters (0-63 scale)
+    ch_peaks[ch] = final_vol;
+
+    if (reached) {
         ch_volslide[ch].active = false;
     }
-
-    // Update volume
-    ch_volslide[ch].current_vol = current;
-    OPL_SetVolume(ch, current << 1);
-    ch_peaks[ch] = current;
 }
 
 void process_vibrato_logic(uint8_t ch) {

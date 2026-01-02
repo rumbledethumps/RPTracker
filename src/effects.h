@@ -26,15 +26,28 @@ typedef struct {
     bool    active;
 } PortamentoState;
 
+// typedef struct {
+//     uint8_t current_vol;
+//     uint8_t target_vol;
+//     uint8_t inst;
+//     uint8_t base_note;
+//     uint8_t mode;         // 0=Up, 1=Down, 2=To Target
+//     uint8_t speed;        // Volume units per tick
+//     uint8_t tick_counter;
+//     bool    active;
+// } VolumeSlideState;
+
 typedef struct {
     uint8_t current_vol;
-    uint8_t target_vol;
-    uint8_t inst;
     uint8_t base_note;
-    uint8_t mode;         // 0=Up, 1=Down, 2=To Target
-    uint8_t speed;        // Volume units per tick
+    uint8_t inst;
+    uint8_t speed;
     uint8_t tick_counter;
-    bool    active;
+    uint16_t vol_accum;   // 8.8 Fixed Point (Integer part in high byte: 0-63)
+    uint16_t speed_fp;    // Fixed point increment per tick
+    uint8_t  target_vol;  // Target integer volume (0-63)
+    uint8_t  mode;        // 0:Up, 1:Down, 2:To Target
+    bool     active;
 } VolumeSlideState;
 
 typedef struct {

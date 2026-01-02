@@ -432,8 +432,10 @@ void draw_ui_dashboard(void) {
     // Row 20: Title
     draw_string(1, 20, "[ COMMAND CHEATSHEET ]", HUD_COL_YELLOW, HUD_COL_BG);
 
-    // Row 21: Navigation & Performance
-    draw_string(2, 21, "Octave  : F1/F2   Pattern   : F9/10    Effect Mode: /       ", HUD_COL_CYAN, HUD_COL_BG);
+    // Row 21: Navigation & Performance    
+    //                0         1         2         3         4         5         6         7         8
+    //                012345678901234567890123456789012345678901234567890123456789012345678901234567890
+    draw_string(2, 21, "Octave  : F1/F2   Pattern   : F9/10    Effect Mode: /        Kill Notes : ESC", HUD_COL_CYAN, HUD_COL_BG);
     // Row 22: Editing & Tools
     draw_string(2, 22, "Inst    : F3/F4   Sequence  : F11/12   Vol/Effect : [ / ]   ", HUD_COL_CYAN, HUD_COL_BG);
     // Row 23: Tools & Effects
@@ -450,7 +452,8 @@ void draw_ui_dashboard(void) {
         // Col 2 Keys (starts at 32)
         set_text_color(32, r, 8, HUD_COL_WHITE, HUD_COL_BG);
         // Col 3 Keys (starts at 53)
-        set_text_color(53, r, 9, HUD_COL_WHITE, HUD_COL_BG);
+        set_text_color(54, r, 8, HUD_COL_WHITE, HUD_COL_BG);
+        set_text_color(76, r, 3, HUD_COL_WHITE, HUD_COL_BG);
     }
     
 }
