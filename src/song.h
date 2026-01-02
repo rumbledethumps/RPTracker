@@ -1,7 +1,7 @@
 #ifndef SONG_H
 #define SONG_H
 
-#define ORDER_LIST_XRAM 0xB000
+#define ORDER_LIST_XRAM 0xB400  // 32 patterns × 1440 bytes = 0xB400
 #define MAX_ORDERS 256 // Note, the user is limited to 64 in the UI, so we could grow in the future.
 #define MAX_ORDERS_USER 64
 

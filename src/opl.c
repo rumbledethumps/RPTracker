@@ -104,9 +104,11 @@ void OPL_NoteOn(uint8_t channel, uint8_t midi_note) {
     }
     
     uint16_t freq = midi_to_opl_freq(midi_note);
+    uint8_t b0_value = (freq >> 8) & 0xFF;  // Includes key-on bit 5
+    
     OPL_Write(0xA0 + channel, freq & 0xFF);
-    OPL_Write(0xB0 + channel, (freq >> 8) & 0xFF);
-    shadow_b0[channel] = (freq >> 8) & 0x1F;
+    OPL_Write(0xB0 + channel, b0_value);
+    shadow_b0[channel] = b0_value;  // Store FULL value including key-on bit
 }
 
 void OPL_SetPitch(uint8_t channel, uint8_t midi_note) {

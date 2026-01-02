@@ -484,24 +484,22 @@ void sequencer_step(void) {
                     ch_tremolo[ch].active = false;
                     ch_finepitch[ch].active = false;
                     
-                    // If vibrato was active, reset pitch to base note before deactivating
-                    if (ch_vibrato[ch].active) {
-                        OPL_SetPitch(ch, ch_vibrato[ch].base_note);
-                    }
+                    // Deactivate vibrato - don't reset pitch here because
+                    // a new note trigger will follow and set its own pitch
                     ch_vibrato[ch].active = false;
-                } else if (cmd == 0 && eff == 0x0000 && last_effect[ch] != 0x0000) {
-                    // Transitioning from an effect to no effect (empty row after effect)
-                    // Keep effects running but reset anything that was offset
-                    if (ch_vibrato[ch].active) {
-                        // Reset to base note pitch
-                        OPL_SetPitch(ch, ch_vibrato[ch].base_note);
-                    }
                 }
+                // Note: Removed the "else if (cmd == 0 && eff == 0x0000)" handler
+                // Empty rows should NOT reset vibrato pitch - let it oscillate freely
                 last_effect[ch] = cell.effect; // Update shadow
             }
 
             // --- 2. TRIGGER NOTE WITH OFFSET ---
             if (cell.note != 0) {
+                // DEBUG: Print note trigger info
+                if (ch == 0 && cur_row == 7) {
+                    RIA.addr0 = 0xFFFF;
+                    xreg_ria_keyboard(0, 0, 0, 1, "Row 7 trigger");
+                }
                 OPL_NoteOff(ch); 
                 if (cell.note != 255) {
                     ch_arp[ch].base_note = cell.note;
