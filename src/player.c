@@ -144,10 +144,13 @@ void player_tick(void) {
         }
     } 
     // 3. Logic: Note Off
-    // Only turn off notes via keyboard when sequencer is NOT playing
+    // Only turn off OPL notes via keyboard when sequencer is NOT playing
+    // But always reset active_midi_note so same note can be re-entered
     else {
-        if (active_midi_note != 0 && !seq.is_playing) {
-            OPL_NoteOff(channel);
+        if (active_midi_note != 0) {
+            if (!seq.is_playing) {
+                OPL_NoteOff(channel);
+            }
             // ch_peaks[channel] = 0; // Clear peak
             active_midi_note = 0;
         }
