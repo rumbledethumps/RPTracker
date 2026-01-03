@@ -5,5 +5,4 @@ CMakeUserPresets.json
 out
 junk
 .DS_Store
-*.RPT
 releases
