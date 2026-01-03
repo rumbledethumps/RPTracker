@@ -484,12 +484,26 @@ void sequencer_step(void) {
                     OPL_NoteOn_Detuned(ch, ch_finepitch[ch].base_note, detune);
                     
                     ch_peaks[ch] = ch_finepitch[ch].vol;
-                } else if (cmd == 0x0A) { // Random Generator
-                    ch_gen[ch].active = true;
-                    ch_gen[ch].scale  = (eff >> 8) & 0x0F;
-                    ch_gen[ch].range  = (eff >> 4) & 0x0F;
-                    ch_gen[ch].target_ticks = arp_tick_lut[eff & 0x0F];
-                    ch_gen[ch].timer = 0;
+                } else if (cmd == 0x0A) { // Random Generator: A S D T
+                    ch_generator[ch].active = true;
+                    ch_generator[ch].scale  = (eff >> 8) & 0x0F;
+                    ch_generator[ch].range  = (eff >> 4) & 0x0F;
+                    ch_generator[ch].target_ticks = arp_tick_lut[eff & 0x0F];
+                    ch_generator[ch].timer = 0;
+
+                    // --- THE FIX: CAPTURE CONTEXT ---
+                    // If there is a note on this row, use it. 
+                    // Otherwise, fall back to the last known state for this channel.
+                    if (cell.note != 0 && cell.note != 255) {
+                        ch_generator[ch].base_note = cell.note;
+                        ch_generator[ch].inst = cell.inst;
+                        ch_generator[ch].vol  = cell.vol;
+                    } else {
+                        // Fallback to Arp memory if no note on this row
+                        ch_generator[ch].base_note = ch_arp[ch].base_note;
+                        ch_generator[ch].inst = ch_arp[ch].inst;
+                        ch_generator[ch].vol  = ch_arp[ch].vol;
+                    }
                 } else if (eff == 0xF000 || (cell.note != 0 && cmd == 0)) {
                     if (ch_tremolo[ch].active) {
                         ch_tremolo[ch].active = false;
@@ -508,7 +522,7 @@ void sequencer_step(void) {
                     // a new note trigger will follow and set its own pitch
                     ch_vibrato[ch].active = false;
 
-                    ch_gen[ch].active = false;
+                    ch_generator[ch].active = false;
 
                 }
                 // Note: Removed the "else if (cmd == 0 && eff == 0x0000)" handler
@@ -526,7 +540,7 @@ void sequencer_step(void) {
                     ch_tremolo[ch].active = false;
                     ch_retrigger[ch].active = false;
                     ch_vibrato[ch].active = false;
-                    ch_gen[ch].active = false;
+                    ch_generator[ch].active = false;
                 }
                 
                 OPL_NoteOff(ch); 
@@ -545,6 +559,14 @@ void sequencer_step(void) {
                     ch_arp[ch].phase_timer = 0;
                     ch_arp[ch].step_index = 0;
                     ch_arp[ch].just_triggered = true; // Prevent immediate re-trigger
+
+                    // If the generator is active, update its memory with the new note/inst/vol
+                    if (ch_generator[ch].active) {
+                        ch_generator[ch].base_note = cell.note;
+                        ch_generator[ch].inst = cell.inst;
+                        ch_generator[ch].vol  = cell.vol;
+                        ch_generator[ch].timer = 0; // Reset timer on new note strike
+                    }
 
                     // Calculate starting offset (Style 1 "Down" starts high!)
                     int16_t start_offset = 0;
@@ -601,6 +623,7 @@ void sequencer_step(void) {
         process_retrigger_logic(ch);
         process_tremolo_logic(ch);
         process_finepitch_logic(ch);
+        process_gen_logic(ch);
     }
 
     // If we just finished the last tick of the row (e.g., Tick 5 of 6)

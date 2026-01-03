@@ -117,7 +117,7 @@ extern NoteDelayState ch_notedelay[9];
 extern RetriggerState ch_retrigger[9];
 extern TremoloState ch_tremolo[9];
 extern FinePitchState ch_finepitch[9];
-extern GenState ch_gen[9];
+extern GenState ch_generator[9];
 
 extern void process_arp_logic(uint8_t ch);
 extern void process_portamento_logic(uint8_t ch);

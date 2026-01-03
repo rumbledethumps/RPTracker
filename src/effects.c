@@ -18,6 +18,7 @@ NoteDelayState ch_notedelay[9];
 RetriggerState ch_retrigger[9];
 TremoloState ch_tremolo[9];
 FinePitchState ch_finepitch[9];
+GenState ch_generator[9];
 
 const uint8_t arp_tick_lut[16] = {
     1, 2, 3, 6, 9, 12, 18, 24, 30, 36, 42, 48, 60, 72, 84, 96
@@ -449,26 +450,25 @@ void process_finepitch_logic(uint8_t ch) {
 }
 
 void process_gen_logic(uint8_t ch) {
-    if (!ch_gen[ch].active) return;
+    if (!ch_generator[ch].active) return;
     if (seq.tick_counter == 0) return; // Let sequencer strike the root
 
-    ch_gen[ch].timer++;
-    if (ch_gen[ch].timer < ch_gen[ch].target_ticks) return;
-
-    ch_gen[ch].timer = 0;
+    ch_generator[ch].timer++;
+    if (ch_generator[ch].timer < ch_generator[ch].target_ticks) return;
+    ch_generator[ch].timer = 0;
 
     // --- GENERATIVE STEP ---
     // 1. Pick a random index within the Depth (D) range
     // Using RIA.vsync as a seed for the 6502
-    uint8_t random_step = RIA.vsync % (ch_gen[ch].range + 1);
+    uint8_t random_step = RIA.vsync % (ch_generator[ch].range + 1);
     
     // 2. Look up the semitone offset for the current scale
-    uint8_t offset = scale_intervals[ch_gen[ch].scale & 0x07][random_step];
+    uint8_t offset = scale_intervals[ch_generator[ch].scale & 0x07][random_step];
 
     // 3. RETRIGGER
     OPL_NoteOff(ch);
-    OPL_SetPatch(ch, &gm_bank[ch_gen[ch].inst]);
-    OPL_SetVolume(ch, ch_gen[ch].vol << 1); 
-    OPL_NoteOn(ch, ch_gen[ch].base_note + offset);
-    ch_peaks[ch] = ch_gen[ch].vol;
+    OPL_SetPatch(ch, &gm_bank[ch_generator[ch].inst]);
+    OPL_SetVolume(ch, ch_generator[ch].vol << 1); 
+    OPL_NoteOn(ch, ch_generator[ch].base_note + offset);
+    ch_peaks[ch] = ch_generator[ch].vol;
 }
