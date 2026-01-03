@@ -439,25 +439,23 @@ void sequencer_step(void) {
                     ch_retrigger[ch].tick_counter = 0;
                 } else if (cmd == 8) {
                     // Tremolo: 8RDT
-                    // R = Rate (ticks per cycle step)
-                    // D = Depth (volume deviation)
-                    // T = Waveform (0=sine, 1=triangle, 2=square)
-                    uint8_t start_vol = (cell.note != 0 && cell.note != 255) ? cell.vol : ch_volslide[ch].current_vol;
-                    uint8_t start_note = (cell.note != 0 && cell.note != 255) ? cell.note : ch_arp[ch].base_note;
-                    uint8_t start_inst = (cell.note != 0 && cell.note != 255) ? cell.inst : ch_arp[ch].inst;
-                    
-                    ch_tremolo[ch].base_vol = start_vol;
-                    ch_tremolo[ch].note = start_note;
-                    ch_tremolo[ch].inst = start_inst;
-                    
+                    uint8_t rate = (eff >> 8) & 0x0F;
+                    uint8_t depth = (eff >> 4) & 0x0F;
+                    uint8_t wave = (eff & 0x0F);
+
+                    // Sync base state
                     ch_tremolo[ch].active = true;
-                    ch_tremolo[ch].rate = (eff >> 8) & 0x0F;
-                    if (ch_tremolo[ch].rate == 0) ch_tremolo[ch].rate = 4;
-                    ch_tremolo[ch].depth = (eff >> 4) & 0x0F;
-                    if (ch_tremolo[ch].depth == 0) ch_tremolo[ch].depth = 4;
-                    ch_tremolo[ch].waveform = (eff & 0x0F) % 3;
-                    ch_tremolo[ch].phase = 0;
-                    ch_tremolo[ch].tick_counter = 0;
+                    ch_tremolo[ch].rate = rate;
+                    ch_tremolo[ch].depth = depth;
+                    ch_tremolo[ch].waveform = wave;
+                    
+                    // Anchor the oscillation to the volume on this row
+                    ch_tremolo[ch].base_vol = (cell.note != 0) ? cell.vol : ch_volslide[ch].current_vol;
+                    
+                    // Optional: Reset phase on new note to make the pulse predictable
+                    if (cell.note != 0) {
+                        ch_tremolo[ch].phase = 0;
+                    }
                 } else if (cmd == 9) {
                     // Fine Pitch: 9__D
                     // D = Detune nibble (0-7 = UP, 8-F = DOWN)
@@ -486,6 +484,10 @@ void sequencer_step(void) {
                     
                     ch_peaks[ch] = ch_finepitch[ch].vol;
                 } else if (eff == 0xF000 || (cell.note != 0 && cmd == 0)) {
+                    if (ch_tremolo[ch].active) {
+                        ch_tremolo[ch].active = false;
+                        OPL_SetVolume(ch, ch_tremolo[ch].base_vol << 1); // Restore original volume
+                    }
                     ch_arp[ch].active = false;
                     ch_porta[ch].active = false;
                     ch_volslide[ch].active = false;

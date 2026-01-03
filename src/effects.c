@@ -351,54 +351,63 @@ void process_retrigger_logic(uint8_t ch) {
 
 void process_tremolo_logic(uint8_t ch) {
     if (!ch_tremolo[ch].active) return;
-    
-    ch_tremolo[ch].tick_counter++;
-    
-    if (ch_tremolo[ch].tick_counter < ch_tremolo[ch].rate) return;
-    ch_tremolo[ch].tick_counter = 0;
-    
-    ch_tremolo[ch].phase += 32;
-    
-    // Calculate volume offset based on waveform
-    int8_t offset = 0;
+
+    // --- TICK 0 GUARD ---
+    // Let the sequencer handle the initial volume setting on Tick 0.
+    if (seq.tick_counter == 0) return;
+
+    // 1. ADVANCE PHASE
+    // Rate (R) now controls how much we add to the phase every frame.
+    // Higher R = faster pulsing.
+    uint8_t rate = ch_tremolo[ch].rate;
+    if (rate == 0) rate = 1; 
+    ch_tremolo[ch].phase += (rate * 4); // Scale factor of 4 for musical speeds
+
+    // 2. CALCULATE LFO OUTPUT
+    // We want a value ranging from -Depth to +Depth
+    int16_t lfo_out = 0;
     uint8_t phase = ch_tremolo[ch].phase;
     uint8_t depth = ch_tremolo[ch].depth;
-    
-    if (depth == 0) depth = 4;
-    
+
     switch (ch_tremolo[ch].waveform) {
-        case 0: // Sine wave
-            if (phase < 64) {
-                offset = (phase * depth) / 64;
-            } else if (phase < 128) {
-                offset = (((127 - phase) * depth) / 64);
-            } else if (phase < 192) {
-                offset = -((phase - 128) * depth) / 64;
-            } else {
-                offset = -(((255 - phase) * depth) / 64);
-            }
-            break;
-            
-        case 1: // Triangle wave
+        case 0: // SINE (High-res approximation)
             if (phase < 128) {
-                offset = (phase * depth) / 128;
+                lfo_out = (phase * depth) / 64 - depth;
             } else {
-                offset = (((255 - phase) * depth) / 128);
+                lfo_out = depth - ((phase - 128) * depth) / 64;
             }
-            offset -= depth / 2;
             break;
             
-        case 2: // Square wave
-            offset = (phase < 128) ? depth : -depth;
+        case 1: // TRIANGLE
+            if (phase < 128) {
+                lfo_out = (phase * depth * 2) / 128 - depth;
+            } else {
+                lfo_out = depth - ((phase - 128) * depth * 2) / 128;
+            }
+            break;
+            
+        case 2: // SQUARE
+            lfo_out = (phase < 128) ? depth : -depth;
+            break;
+
+        case 3: // SAWTOOTH
+            lfo_out = (phase * depth * 2) / 255 - depth;
             break;
     }
-    
-    // Apply volume offset
-    int16_t new_vol = (int16_t)ch_tremolo[ch].base_vol + offset;
-    if (new_vol < 0) new_vol = 0;
+
+    // 3. APPLY TO BASE VOLUME
+    int16_t new_vol = (int16_t)ch_tremolo[ch].base_vol + lfo_out;
+
+    // 4. STRICT CLAMPING (0-63)
+    // This prevents the 'cycle back on' bug
+    if (new_vol < 0)  new_vol = 0;
     if (new_vol > 63) new_vol = 63;
-    
+
+    // 5. OUTPUT TO HARDWARE
+    // Using your MIDI << 1 mapping
     OPL_SetVolume(ch, (uint8_t)new_vol << 1);
+    
+    // Update visual peaks
     ch_peaks[ch] = (uint8_t)new_vol;
 }
 
