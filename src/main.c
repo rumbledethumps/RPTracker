@@ -1,5 +1,6 @@
 #include <rp6502.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "constants.h"
 #include "input.h"
 #include "instruments.h"
@@ -147,6 +148,10 @@ int main(void)
                     is_saving = false;
                     dialog_pos = 0;
                     dialog_buffer[0] = '\0';
+                }
+                if (key_pressed(KEY_Q)) {
+                    OPL_Panic();
+                    exit(0);
                 }
             }
 

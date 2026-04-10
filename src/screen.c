@@ -465,13 +465,13 @@ void draw_ui_dashboard(void) {
     //                012345678901234567890123456789012345678901234567890123456789012345678901234567890
     draw_string(2, 21, "Octave  : F1/F2   Pattern   : F9/10    Effect Mode: /        Kill Notes : ESC", HUD_COL_CYAN, HUD_COL_BG);
     // Row 22: Editing & Tools
-    draw_string(2, 22, "Inst    : F3/F4   Sequence  : F11/12   Vol/Effect : [ / ]   ", HUD_COL_CYAN, HUD_COL_BG);
+    draw_string(2, 22, "Inst    : F3/F4   Sequence  : F11/12   Vol/Effect : [ / ]    Follow Me  : F6 ", HUD_COL_CYAN, HUD_COL_BG);
     // Row 23: Tools & Effects
-    draw_string(2, 23, "Pick Ins: F5      Transpose : - / =    Effect Par : ; / '    Tempo:       F7", HUD_COL_CYAN, HUD_COL_BG);
+    draw_string(2, 23, "Pick Ins: F5      Transpose : - / =    Effect Par : ; / '    Tempo      : F7", HUD_COL_CYAN, HUD_COL_BG);
     // Row 24: Transport & Files
     draw_string(2, 24, "Play    : Enter   Copy/Paste: Ctrl+C/V Save/Load  : Ctrl+S/O", HUD_COL_CYAN, HUD_COL_BG);
     // Row 25: Mode & Safety
-    draw_string(2, 25, "Record  : Space   Song Mode : F8       Follow Me  : F6      ", HUD_COL_CYAN, HUD_COL_BG);
+    draw_string(2, 25, "Record  : Space   Song Mode : F8       Quit       : Ctrl+Q  ", HUD_COL_CYAN, HUD_COL_BG);
 
     // Highlight the KEYS in White
     for (uint8_t r = 21; r <= 25; r++) {
